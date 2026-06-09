@@ -37,7 +37,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku
 .gas-input:focus{outline:2px solid #e07030;border-color:transparent}
 .chk-wrap{width:32px;height:32px;display:flex;align-items:center;justify-content:center}
 input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
-.result-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e8e8e8;padding:10px 14px 16px;z-index:100;box-shadow:0 -4px 16px rgba(0,0,0,0.08)}
+.result-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e8e8e8;padding:10px 14px calc(16px + env(safe-area-inset-bottom));z-index:100;box-shadow:0 -4px 16px rgba(0,0,0,0.08);transform:translateZ(0)}
 .result-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .result-label{font-size:11px;color:#aaa;font-weight:500}
 .reset-btn{font-size:12px;color:#aaa;background:none;border:1px solid #e0e0e0;border-radius:6px;padding:4px 10px;cursor:pointer;display:flex;align-items:center;gap:4px}
@@ -160,13 +160,13 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
     <div class="gas-row">
       <div class="gas-label"><div class="row-name">R32 補填</div><div class="row-price">3,500円 / 100g（税抜）</div></div>
       <span class="gas-unit">100g ×</span>
-      <input class="gas-input" type="number" id="r32-qty" value="0" min="0" max="99" inputmode="numeric" oninput="calcAll()">
+      <input class="gas-input" type="number" id="r32-qty" value="0" min="0" max="999" step="0.1" inputmode="decimal" oninput="calcAll()">
       <span class="row-calc" id="r32-price"></span>
     </div>
     <div class="gas-row">
       <div class="gas-label"><div class="row-name">R410A 補填</div><div class="row-price">3,500円 / 100g（税抜）</div></div>
       <span class="gas-unit">100g ×</span>
-      <input class="gas-input" type="number" id="r410a-qty" value="0" min="0" max="99" inputmode="numeric" oninput="calcAll()">
+      <input class="gas-input" type="number" id="r410a-qty" value="0" min="0" max="999" step="0.1" inputmode="decimal" oninput="calcAll()">
       <span class="row-calc" id="r410a-price"></span>
     </div>
     <div class="row">
@@ -402,6 +402,25 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
     </div>
   </div>
 
+  <div class="section">
+    <div class="section-header">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      予備・その他
+    </div>
+    <div class="gas-row">
+      <div class="gas-label"><div class="row-name">予備金額①</div><div class="row-price">税込金額を直接入力</div></div>
+      <input class="gas-input" type="number" id="spare1-qty" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
+      <span class="gas-unit">円</span>
+      <span class="row-calc" id="spare1-price"></span>
+    </div>
+    <div class="gas-row">
+      <div class="gas-label"><div class="row-name">予備金額②</div><div class="row-price">税込金額を直接入力</div></div>
+      <input class="gas-input" type="number" id="spare2-qty" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
+      <span class="gas-unit">円</span>
+      <span class="row-calc" id="spare2-price"></span>
+    </div>
+  </div>
+
   <div class="note">
     ※ 設置状況や機種によって料金が異なる場合があります。<br>
     ※ 駐車場代が別途発生する場合があります。
@@ -514,6 +533,8 @@ const ITEMS = {
   'hole-m':    { taxin: 5500,  label: '穴あけ モルタル' },
   'hole-rc':   { taxin: 11000, label: '穴あけ RC' },
   'cover':     { taxin: 3300,  label: '化粧カバー', unit:'m' },
+  'spare1':    { taxin: 1,     label: '予備金額①', spare: true },
+  'spare2':    { taxin: 1,     label: '予備金額②', spare: true },
 };
 
 const qty = {};
@@ -531,7 +552,7 @@ function changeQty(key, delta) {
 }
 function getGasQty(key) {
   const el = document.getElementById(key + '-qty');
-  return Math.max(0, parseInt(el ? el.value : 0) || 0);
+  return Math.max(0, parseFloat(el ? el.value : 0) || 0);
 }
 
 let currentLines = [], currentTaxin = 0;
@@ -540,7 +561,17 @@ function calcAll() {
   let total = 0; const lines = [];
   Object.entries(ITEMS).forEach(([key, item]) => {
     let q = 0, sub = 0;
-    if (item.gas) {
+    if (item.spare) {
+      const el = document.getElementById(key + '-qty');
+      sub = Math.max(0, parseInt(el ? el.value : 0) || 0);
+      const pEl = document.getElementById(key + '-price');
+      if (pEl) pEl.textContent = sub > 0 ? fmt(sub) + '円' : '';
+      if (sub > 0) {
+        total += sub;
+        lines.push({ name: item.label, price: sub });
+      }
+      return;
+    } else if (item.gas) {
       q = getGasQty(key); sub = q * item.taxin;
       const el = document.getElementById(key + '-price');
       if (el) el.textContent = q > 0 ? fmt(sub) + '円' : '';
@@ -814,6 +845,28 @@ function showToast(msg) {
 
 updateHistoryCount();
 calcAll();
+
+// 入力欄タップ時にキーボードで隠れないよう自動スクロール
+document.addEventListener('focusin', function(e) {
+  const el = e.target;
+  if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') return;
+  // メモ欄・設定欄以外の数値入力中は合計バーを隠す
+  if (el.type === 'number') {
+    document.querySelector('.result-bar').style.display = 'none';
+  }
+  setTimeout(function() {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 350);
+});
+
+document.addEventListener('focusout', function(e) {
+  const el = e.target;
+  if (el.type === 'number') {
+    setTimeout(function() {
+      document.querySelector('.result-bar').style.display = '';
+    }, 100);
+  }
+});
 </script>
 </body>
 </html>
