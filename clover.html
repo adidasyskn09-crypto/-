@@ -160,13 +160,13 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
     <div class="gas-row">
       <div class="gas-label"><div class="row-name">R32 補填</div><div class="row-price">3,500円 / 100g（税抜）</div></div>
       <span class="gas-unit">100g ×</span>
-      <input class="gas-input" type="number" id="r32-qty" value="0" min="0" max="999" step="0.1" inputmode="decimal" oninput="calcAll()">
+      <input class="gas-input" type="text" id="r32-qty" value="0" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" oninput="calcAll()">
       <span class="row-calc" id="r32-price"></span>
     </div>
     <div class="gas-row">
       <div class="gas-label"><div class="row-name">R410A 補填</div><div class="row-price">3,500円 / 100g（税抜）</div></div>
       <span class="gas-unit">100g ×</span>
-      <input class="gas-input" type="number" id="r410a-qty" value="0" min="0" max="999" step="0.1" inputmode="decimal" oninput="calcAll()">
+      <input class="gas-input" type="text" id="r410a-qty" value="0" inputmode="decimal" pattern="[0-9]*\.?[0-9]*" oninput="calcAll()">
       <span class="row-calc" id="r410a-price"></span>
     </div>
     <div class="row">
@@ -408,13 +408,13 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
       予備・その他
     </div>
     <div class="gas-row">
-      <div class="gas-label"><div class="row-name">予備金額①</div><div class="row-price">税込金額を直接入力</div></div>
+      <div class="gas-label"><div class="row-name">予備金額①</div><div class="row-price">税抜金額を入力</div></div>
       <input class="gas-input" type="number" id="spare1-qty" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
       <span class="gas-unit">円</span>
       <span class="row-calc" id="spare1-price"></span>
     </div>
     <div class="gas-row">
-      <div class="gas-label"><div class="row-name">予備金額②</div><div class="row-price">税込金額を直接入力</div></div>
+      <div class="gas-label"><div class="row-name">予備金額②</div><div class="row-price">税抜金額を入力</div></div>
       <input class="gas-input" type="number" id="spare2-qty" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
       <span class="gas-unit">円</span>
       <span class="row-calc" id="spare2-price"></span>
@@ -552,7 +552,8 @@ function changeQty(key, delta) {
 }
 function getGasQty(key) {
   const el = document.getElementById(key + '-qty');
-  return Math.max(0, parseFloat(el ? el.value : 0) || 0);
+  const v = el ? el.value.replace(/[^\d.]/g, '') : '0';
+  return Math.max(0, parseFloat(v) || 0);
 }
 
 let currentLines = [], currentTaxin = 0;
@@ -563,9 +564,10 @@ function calcAll() {
     let q = 0, sub = 0;
     if (item.spare) {
       const el = document.getElementById(key + '-qty');
-      sub = Math.max(0, parseInt(el ? el.value : 0) || 0);
+      const taxex = Math.max(0, parseInt(el ? el.value : 0) || 0);
+      sub = Math.round(taxex * 1.1);
       const pEl = document.getElementById(key + '-price');
-      if (pEl) pEl.textContent = sub > 0 ? fmt(sub) + '円' : '';
+      if (pEl) pEl.textContent = taxex > 0 ? fmt(sub) + '円' : '';
       if (sub > 0) {
         total += sub;
         lines.push({ name: item.label, price: sub });
