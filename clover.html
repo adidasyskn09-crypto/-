@@ -110,9 +110,37 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 .test-btn:active{background:#fff5f0}
 .name-input{width:100%;height:38px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;color:#1a1a1a;background:#fff}
 .name-input:focus{outline:2px solid #e07030;border-color:transparent}
+.pdf-btn{font-size:12px;color:#555;background:none;border:1px solid #e0e0e0;border-radius:6px;padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.pdf-btn:active{background:#f5f5f5}
+
+/* PDF印刷レイアウト */
+#print-area{display:none}
+@media print{
+  body > *{display:none !important}
+  #print-area{display:block !important;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;color:#1a1a1a;padding:20mm 15mm}
+  .p-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8mm;border-bottom:2px solid #e07030;padding-bottom:4mm}
+  .p-company{font-size:18pt;font-weight:700;color:#e07030}
+  .p-doc-type{font-size:22pt;font-weight:700;text-align:right;color:#1a1a1a}
+  .p-date{font-size:10pt;color:#888;text-align:right;margin-top:1mm}
+  .p-to{font-size:14pt;font-weight:600;margin-bottom:6mm;border-bottom:1px solid #e0e0e0;padding-bottom:3mm}
+  .p-table{width:100%;border-collapse:collapse;margin-bottom:6mm}
+  .p-table th{background:#f5f5f5;padding:2mm 3mm;font-size:10pt;text-align:left;border:0.5px solid #ddd}
+  .p-table td{padding:2mm 3mm;font-size:10pt;border:0.5px solid #ddd}
+  .p-table td.price{text-align:right}
+  .p-total-wrap{text-align:right;margin-bottom:6mm}
+  .p-total-row{display:flex;justify-content:flex-end;gap:6mm;align-items:baseline;margin-bottom:1mm}
+  .p-total-label{font-size:10pt;color:#888}
+  .p-total-val{font-size:12pt;font-weight:600;min-width:30mm;text-align:right}
+  .p-total-main{font-size:18pt;font-weight:700;color:#e07030}
+  .p-memo{font-size:9pt;color:#888;margin-bottom:4mm}
+  .p-notes{font-size:9pt;color:#aaa;border-top:1px solid #e0e0e0;padding-top:3mm;line-height:1.8}
+  .p-staff{font-size:9pt;color:#888;margin-top:4mm;text-align:right}
+}
 </style>
 </head>
 <body>
+
+<div id="print-area"></div>
 
 <div class="tabs">
   <div class="tab active" id="tab-calc" onclick="switchTab('calc')">計算</div>
@@ -419,6 +447,14 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
       <span class="gas-unit">円</span>
       <span class="row-calc" id="spare2-price"></span>
     </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">エラーコード</div></div>
+      <input type="text" id="error-input" placeholder="例：E6、F3など" maxlength="40" style="flex:2;height:32px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;color:#1a1a1a">
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">発注部品</div></div>
+      <input type="text" id="parts-input" placeholder="例：基板、ファンモーター" maxlength="60" style="flex:2;height:32px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;color:#1a1a1a">
+    </div>
   </div>
 
   <div class="note">
@@ -589,7 +625,12 @@ function calcAll() {
     }
     if (sub > 0) {
       total += sub;
-      const u = item.unit ? '×' + q + item.unit : (q > 1 ? '×' + q : '');
+      let u;
+      if (item.gas) {
+        u = '×' + q + '（' + Math.round(q * 100) + 'g）';
+      } else {
+        u = item.unit ? '×' + q + item.unit : (q > 1 ? '×' + q : '');
+      }
       lines.push({ name: item.label + (u ? ' ' + u : ''), price: sub });
     }
   });
@@ -611,6 +652,8 @@ function resetAll() {
   document.querySelectorAll('input[type=checkbox]').forEach(el => el.checked = false);
   document.querySelectorAll('input.gas-input').forEach(el => el.value = 0);
   document.getElementById('memo-input').value = '';
+  document.getElementById('error-input').value = '';
+  document.getElementById('parts-input').value = '';
   currentTaxin = 0; currentLines = [];
   document.getElementById('total-in').textContent = '0';
   document.getElementById('total-ex').textContent = '0';
@@ -639,6 +682,8 @@ async function saveRecord() {
   if (currentTaxin === 0) return;
   const settings = loadSettings();
   const memo = document.getElementById('memo-input').value.trim();
+  const errorCode = document.getElementById('error-input').value.trim();
+  const parts = document.getElementById('parts-input').value.trim();
   const now = new Date();
   const dateStr = now.getFullYear() + '/' +
     String(now.getMonth()+1).padStart(2,'0') + '/' +
@@ -650,6 +695,8 @@ async function saveRecord() {
     id: Date.now(),
     date: dateStr,
     memo: memo || '（メモなし）',
+    errorCode: errorCode,
+    parts: parts,
     taxin: currentTaxin,
     taxex: Math.round(currentTaxin / 1.1),
     lines: currentLines.slice(),
@@ -738,6 +785,8 @@ function renderHistory() {
         <div class="history-meta">
           <div class="history-date">${r.date}　${esc(r.deviceId || '')}</div>
           <div class="history-memo">${esc(r.memo)}</div>
+          ${r.errorCode ? `<div style="font-size:12px;color:#e07030;margin-top:2px">🔧 ${esc(r.errorCode)}</div>` : ''}
+          ${r.parts ? `<div style="font-size:12px;color:#888;margin-top:2px">📦 ${esc(r.parts)}</div>` : ''}
           ${syncHtml}
         </div>
         <div class="history-amounts">
@@ -750,6 +799,10 @@ function renderHistory() {
       </div>
       <div class="history-del">
         ${retryHtml}
+        <button class="pdf-btn" onclick="printPDF(${r.id})">
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#555;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          PDF
+        </button>
         <button class="del-btn" onclick="deleteRecord(${r.id})">
           <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#ccc;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
           削除
@@ -757,6 +810,67 @@ function renderHistory() {
       </div>
     </div>`;
   }).join('');
+}
+
+function printPDF(id) {
+  const r = loadHistory().find(rec => rec.id === id);
+  if (!r) return;
+  const settings = loadSettings();
+  const staffName = settings.staffName || '';
+  const rows = r.lines.map(l => `
+    <tr>
+      <td>${esc(l.name)}</td>
+      <td class="price">${fmt(Math.round(l.price / 1.1))}円</td>
+      <td class="price">${fmt(l.price - Math.round(l.price / 1.1))}円</td>
+      <td class="price">${fmt(l.price)}円</td>
+    </tr>`).join('');
+  const memoHtml = (r.errorCode || r.parts) ? `
+    <div class="p-memo">
+      ${r.errorCode ? `エラーコード：${esc(r.errorCode)}　` : ''}
+      ${r.parts ? `発注部品：${esc(r.parts)}` : ''}
+    </div>` : '';
+  document.getElementById('print-area').innerHTML = `
+    <div class="p-header">
+      <div class="p-company">株式会社Clover</div>
+      <div>
+        <div class="p-doc-type">御見積書</div>
+        <div class="p-date">${r.date}</div>
+      </div>
+    </div>
+    <div class="p-to">${esc(r.memo)}　御中</div>
+    <table class="p-table">
+      <thead>
+        <tr>
+          <th style="width:55%">項目</th>
+          <th style="width:15%">税抜金額</th>
+          <th style="width:15%">消費税</th>
+          <th style="width:15%">税込金額</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="p-total-wrap">
+      <div class="p-total-row">
+        <span class="p-total-label">税抜合計</span>
+        <span class="p-total-val">${fmt(r.taxex)}円</span>
+      </div>
+      <div class="p-total-row">
+        <span class="p-total-label">消費税（10%）</span>
+        <span class="p-total-val">${fmt(r.taxin - r.taxex)}円</span>
+      </div>
+      <div class="p-total-row">
+        <span class="p-total-label">税込合計</span>
+        <span class="p-total-main">${fmt(r.taxin)}円</span>
+      </div>
+    </div>
+    ${memoHtml}
+    <div class="p-notes">
+      ※ 設置状況や機種によって料金が異なる場合があります。<br>
+      ※ 駐車場代が別途発生する場合があります。
+    </div>
+    ${staffName ? `<div class="p-staff">担当：${esc(staffName)}</div>` : ''}
+  `;
+  window.print();
 }
 
 function exportCSV() {
