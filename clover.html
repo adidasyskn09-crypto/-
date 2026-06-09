@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>料金計算 | Clover</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;background:#f5f5f5;color:#1a1a1a;font-size:15px}
+.tabs{display:flex;background:#fff;border-bottom:1px solid #e8e8e8;position:sticky;top:0;z-index:50}
+.tab{flex:1;padding:14px 0;text-align:center;font-size:14px;font-weight:500;color:#aaa;cursor:pointer;border-bottom:2px solid transparent;transition:color 0.15s,border-color 0.15s}
+.tab.active{color:#e07030;border-bottom-color:#e07030}
+.page{display:none}
+.page.active{display:block}
+.main{padding:12px 12px 220px}
+.section{background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.section-header{padding:11px 14px;background:#fafafa;border-bottom:1px solid #f0f0f0;font-size:12px;font-weight:600;color:#888;letter-spacing:0.04em;display:flex;align-items:center;gap:6px}
+.section-header svg{width:14px;height:14px;fill:none;stroke:#e07030;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+.row{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid #f5f5f5;gap:10px}
+.row:last-child{border-bottom:none}
+.row-label{flex:1;min-width:0}
+.row-name{font-size:14px;color:#1a1a1a;line-height:1.4}
+.row-price{font-size:11px;color:#aaa;margin-top:2px}
+.row-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.row-calc{font-size:12px;color:#e07030;font-weight:500;min-width:72px;text-align:right;white-space:nowrap}
+.qty-wrap{display:flex;align-items:center}
+.qty-btn{width:32px;height:32px;border:1px solid #e0e0e0;background:#fff;color:#555;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none}
+.qty-btn:first-child{border-radius:8px 0 0 8px}
+.qty-btn:last-child{border-radius:0 8px 8px 0}
+.qty-btn:active{background:#f0f0f0}
+.qty-val{font-size:14px;font-weight:600;width:34px;text-align:center;border-top:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;height:32px;line-height:32px;background:#fff;color:#1a1a1a}
+.gas-row{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid #f5f5f5;gap:10px}
+.gas-row:last-child{border-bottom:none}
+.gas-label{flex:1;min-width:0}
+.gas-unit{font-size:12px;color:#aaa;white-space:nowrap}
+.gas-input{width:60px;height:32px;border:1px solid #e0e0e0;border-radius:8px;text-align:center;font-size:15px;font-weight:600;color:#1a1a1a;background:#fff;padding:0;-webkit-appearance:none}
+.gas-input:focus{outline:2px solid #e07030;border-color:transparent}
+.chk-wrap{width:32px;height:32px;display:flex;align-items:center;justify-content:center}
+input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
+.result-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e8e8e8;padding:10px 14px 16px;z-index:100;box-shadow:0 -4px 16px rgba(0,0,0,0.08)}
+.result-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.result-label{font-size:11px;color:#aaa;font-weight:500}
+.reset-btn{font-size:12px;color:#aaa;background:none;border:1px solid #e0e0e0;border-radius:6px;padding:4px 10px;cursor:pointer;display:flex;align-items:center;gap:4px}
+.reset-btn:active{background:#f5f5f5}
+.result-amounts{display:flex;align-items:baseline;gap:10px;margin-bottom:8px}
+.result-taxin{font-size:26px;font-weight:700;color:#e07030;line-height:1}
+.result-taxin-label{font-size:11px;color:#aaa;margin-top:1px}
+.result-divider{width:1px;height:26px;background:#e8e8e8}
+.result-taxex-wrap{display:flex;flex-direction:column}
+.result-taxex{font-size:15px;font-weight:500;color:#555}
+.result-taxex-label{font-size:11px;color:#aaa;margin-top:1px}
+.result-items{font-size:11px;color:#bbb;line-height:1.6;max-height:30px;overflow:hidden;margin-bottom:8px}
+.memo-wrap{margin-bottom:8px}
+.memo-input{width:100%;height:36px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;color:#1a1a1a;background:#fff}
+.memo-input::placeholder{color:#ccc}
+.memo-input:focus{outline:2px solid #e07030;border-color:transparent}
+.save-btn{width:100%;padding:13px;background:#e07030;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity 0.15s}
+.save-btn:active{opacity:0.8}
+.save-btn:disabled{background:#ccc;cursor:default}
+.note{font-size:11px;color:#aaa;padding:10px 14px;line-height:1.7;background:#fff;border-radius:12px;margin-bottom:10px}
+.history-toolbar{padding:12px 12px 0;display:flex;justify-content:flex-end}
+.export-btn{font-size:13px;color:#e07030;background:#fff;border:1px solid #e07030;border-radius:8px;padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:5px;font-weight:500}
+.export-btn:active{background:#fff5f0}
+.export-btn svg{width:14px;height:14px;stroke:#e07030;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.history-main{padding:12px 12px 40px}
+.history-empty{text-align:center;padding:60px 20px;color:#bbb;font-size:14px;line-height:2}
+.history-empty svg{width:40px;height:40px;stroke:#ddd;stroke-width:1.5;fill:none;margin:0 auto 12px;display:block}
+.history-item{background:#fff;border-radius:12px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.history-head{padding:12px 14px;display:flex;align-items:flex-start;justify-content:space-between;border-bottom:1px solid #f5f5f5;gap:8px}
+.history-meta{flex:1;min-width:0}
+.history-date{font-size:11px;color:#aaa;margin-bottom:2px}
+.history-memo{font-size:14px;font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.history-amounts{text-align:right;flex-shrink:0}
+.history-taxin{font-size:20px;font-weight:700;color:#e07030;line-height:1.2}
+.history-taxex{font-size:11px;color:#aaa;margin-top:2px}
+.history-sync{font-size:11px;margin-top:2px}
+.history-sync.ok{color:#4caf50}
+.history-sync.err{color:#e57373}
+.history-sync.pending{color:#aaa}
+.history-lines{padding:10px 14px}
+.history-line{font-size:12px;color:#888;line-height:1.8;border-bottom:1px solid #f5f5f5;padding-bottom:4px;margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+.history-line:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.history-line-name{color:#666}
+.history-line-price{color:#e07030;font-weight:500;white-space:nowrap}
+.history-del{padding:8px 14px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #f5f5f5}
+.del-btn{font-size:12px;color:#ccc;background:none;border:none;cursor:pointer;padding:4px 0;display:inline-flex;align-items:center;gap:4px}
+.del-btn:active{color:#e07030}
+.retry-btn{font-size:12px;color:#e07030;background:none;border:1px solid #e07030;border-radius:6px;padding:4px 10px;cursor:pointer}
+.retry-btn:active{background:#fff5f0}
+.toast{position:fixed;bottom:200px;left:50%;transform:translateX(-50%) translateY(10px);background:#333;color:#fff;font-size:12px;padding:7px 16px;border-radius:20px;opacity:0;transition:opacity 0.2s,transform 0.2s;pointer-events:none;white-space:nowrap;z-index:200}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* 設定ページ */
+.settings-main{padding:16px 12px 40px}
+.settings-section{background:#fff;border-radius:12px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.settings-title{padding:11px 14px;background:#fafafa;border-bottom:1px solid #f0f0f0;font-size:12px;font-weight:600;color:#888;letter-spacing:0.04em}
+.settings-row{padding:14px}
+.settings-label{font-size:13px;color:#555;margin-bottom:6px;font-weight:500}
+.settings-input{width:100%;height:38px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;color:#1a1a1a;background:#fff}
+.settings-input:focus{outline:2px solid #e07030;border-color:transparent}
+.settings-note{font-size:11px;color:#aaa;margin-top:6px;line-height:1.6}
+.settings-save-btn{width:100%;padding:13px;background:#e07030;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;margin-top:4px}
+.settings-save-btn:active{opacity:0.8}
+.status-row{padding:12px 14px;display:flex;align-items:center;justify-content:space-between}
+.status-label{font-size:13px;color:#555}
+.status-val{font-size:13px;font-weight:500}
+.status-val.ok{color:#4caf50}
+.status-val.ng{color:#e57373}
+.status-val.none{color:#aaa}
+.test-btn{font-size:12px;color:#e07030;background:none;border:1px solid #e07030;border-radius:6px;padding:5px 12px;cursor:pointer}
+.test-btn:active{background:#fff5f0}
+.name-input{width:100%;height:38px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;color:#1a1a1a;background:#fff}
+.name-input:focus{outline:2px solid #e07030;border-color:transparent}
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <div class="tab active" id="tab-calc" onclick="switchTab('calc')">計算</div>
+  <div class="tab" id="tab-history" onclick="switchTab('history')">履歴 <span id="history-count"></span></div>
+  <div class="tab" id="tab-settings" onclick="switchTab('settings')">設定</div>
+</div>
+
+<!-- 計算ページ -->
+<div class="page active" id="page-calc">
+<div class="main">
+  <div class="section">
+    <div class="section-header">
+      <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      点検費
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">壁掛け型</div><div class="row-price">8,000円 / 台（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('kabe',-1)">−</button>
+          <span class="qty-val" id="kabe-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('kabe',1)">＋</button>
+        </div>
+        <span class="row-calc" id="kabe-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">天カセ型</div><div class="row-price">12,000円 / 台（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('tenkase-t',-1)">−</button>
+          <span class="qty-val" id="tenkase-t-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('tenkase-t',1)">＋</button>
+        </div>
+        <span class="row-calc" id="tenkase-t-price"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+      ガス漏れ修理
+    </div>
+    <div class="gas-row">
+      <div class="gas-label"><div class="row-name">R32 補填</div><div class="row-price">3,500円 / 100g（税抜）</div></div>
+      <span class="gas-unit">100g ×</span>
+      <input class="gas-input" type="number" id="r32-qty" value="0" min="0" max="99" inputmode="numeric" oninput="calcAll()">
+      <span class="row-calc" id="r32-price"></span>
+    </div>
+    <div class="gas-row">
+      <div class="gas-label"><div class="row-name">R410A 補填</div><div class="row-price">3,500円 / 100g（税抜）</div></div>
+      <span class="gas-unit">100g ×</span>
+      <input class="gas-input" type="number" id="r410a-qty" value="0" min="0" max="99" inputmode="numeric" oninput="calcAll()">
+      <span class="row-calc" id="r410a-price"></span>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">配管修理（フレア・真空引き）</div><div class="row-price">18,000円（税抜）</div></div>
+      <div class="row-right">
+        <div class="chk-wrap"><input type="checkbox" id="haikan" onchange="calcAll()"></div>
+        <span class="row-calc" id="haikan-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">ガス漏れ箇所調査</div><div class="row-price">5,000〜8,000円（税抜）</div></div>
+      <div class="row-right">
+        <div class="chk-wrap"><input type="checkbox" id="chosa" onchange="calcAll()"></div>
+        <span class="row-calc" id="chosa-price"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <svg viewBox="0 0 24 24"><path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2 2 0 1 1 19 12H2"/></svg>
+      エアコンクリーニング（高圧洗浄・分解洗浄）
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">ノーマル</div><div class="row-price">15,000円〜（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('normal',-1)">−</button>
+          <span class="qty-val" id="normal-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('normal',1)">＋</button>
+        </div>
+        <span class="row-calc" id="normal-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">お掃除機能付き</div><div class="row-price">30,000円〜（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('osoji',-1)">−</button>
+          <span class="qty-val" id="osoji-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('osoji',1)">＋</button>
+        </div>
+        <span class="row-calc" id="osoji-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">天カセ（1方向／2方向／4方向）</div><div class="row-price">35,000円（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('tenkase-c',-1)">−</button>
+          <span class="qty-val" id="tenkase-c-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('tenkase-c',1)">＋</button>
+        </div>
+        <span class="row-calc" id="tenkase-c-price"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <svg viewBox="0 0 24 24"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+      水漏れ修理（詰まり除去＋薬剤洗浄）
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">お掃除機能なし</div><div class="row-price">25,000円〜（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('mizu-n',-1)">−</button>
+          <span class="qty-val" id="mizu-n-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('mizu-n',1)">＋</button>
+        </div>
+        <span class="row-calc" id="mizu-n-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">お掃除機能付き</div><div class="row-price">33,000円〜（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('mizu-a',-1)">−</button>
+          <span class="qty-val" id="mizu-a-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('mizu-a',1)">＋</button>
+        </div>
+        <span class="row-calc" id="mizu-a-price"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 3H8l-2 4h12z"/></svg>
+      エアコン新設・入替
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">標準取り付け工事</div><div class="row-price">18,000円〜（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('inst',-1)">−</button>
+          <span class="qty-val" id="inst-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('inst',1)">＋</button>
+        </div>
+        <span class="row-calc" id="inst-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">取外し撤去</div><div class="row-price">8,000円〜（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('removal',-1)">−</button>
+          <span class="qty-val" id="removal-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('removal',1)">＋</button>
+        </div>
+        <span class="row-calc" id="removal-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">運搬費</div><div class="row-price">5,000円〜（税抜）</div></div>
+      <div class="row-right">
+        <div class="chk-wrap"><input type="checkbox" id="unso" onchange="calcAll()"></div>
+        <span class="row-calc" id="unso-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">高所難所作業費</div><div class="row-price">15,000円（税抜）</div></div>
+      <div class="row-right">
+        <div class="chk-wrap"><input type="checkbox" id="kojo" onchange="calcAll()"></div>
+        <span class="row-calc" id="kojo-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">冷媒管新調 2分3分</div><div class="row-price">3,500円 / m（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('pipe23',-1)">−</button>
+          <span class="qty-val" id="pipe23-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('pipe23',1)">＋</button>
+        </div>
+        <span style="font-size:11px;color:#aaa">m</span>
+        <span class="row-calc" id="pipe23-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">冷媒管新調 2分4分</div><div class="row-price">5,000円 / m（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('pipe24',-1)">−</button>
+          <span class="qty-val" id="pipe24-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('pipe24',1)">＋</button>
+        </div>
+        <span style="font-size:11px;color:#aaa">m</span>
+        <span class="row-calc" id="pipe24-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">冷媒管新調 3分5分</div><div class="row-price">7,000円 / m（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('pipe35',-1)">−</button>
+          <span class="qty-val" id="pipe35-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('pipe35',1)">＋</button>
+        </div>
+        <span style="font-size:11px;color:#aaa">m</span>
+        <span class="row-calc" id="pipe35-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">Fケーブル 3芯2.0㎜</div><div class="row-price">1,000円 / m（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('cable',-1)">−</button>
+          <span class="qty-val" id="cable-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('cable',1)">＋</button>
+        </div>
+        <span style="font-size:11px;color:#aaa">m</span>
+        <span class="row-calc" id="cable-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">ドレンホース</div><div class="row-price">600円 / m（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('drain',-1)">−</button>
+          <span class="qty-val" id="drain-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('drain',1)">＋</button>
+        </div>
+        <span style="font-size:11px;color:#aaa">m</span>
+        <span class="row-calc" id="drain-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">穴あけ（木造・サイディング）</div><div class="row-price">5,000円（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('hole-w',-1)">−</button>
+          <span class="qty-val" id="hole-w-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('hole-w',1)">＋</button>
+        </div>
+        <span class="row-calc" id="hole-w-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">穴あけ（モルタル・ALC）</div><div class="row-price">5,000円（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('hole-m',-1)">−</button>
+          <span class="qty-val" id="hole-m-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('hole-m',1)">＋</button>
+        </div>
+        <span class="row-calc" id="hole-m-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">穴あけ（RC）</div><div class="row-price">10,000円（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('hole-rc',-1)">−</button>
+          <span class="qty-val" id="hole-rc-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('hole-rc',1)">＋</button>
+        </div>
+        <span class="row-calc" id="hole-rc-price"></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="row-label"><div class="row-name">化粧カバー</div><div class="row-price">3,000円 / m（税抜）</div></div>
+      <div class="row-right">
+        <div class="qty-wrap">
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('cover',-1)">−</button>
+          <span class="qty-val" id="cover-qty">0</span>
+          <button class="qty-btn" ontouchstart="" onclick="changeQty('cover',1)">＋</button>
+        </div>
+        <span style="font-size:11px;color:#aaa">m</span>
+        <span class="row-calc" id="cover-price"></span>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    ※ 設置状況や機種によって料金が異なる場合があります。<br>
+    ※ 駐車場代が別途発生する場合があります。
+  </div>
+</div>
+
+<div class="result-bar">
+  <div class="result-top">
+    <span class="result-label">合計金額</span>
+    <button class="reset-btn" onclick="resetAll()">
+      <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#aaa;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+      リセット
+    </button>
+  </div>
+  <div class="result-amounts">
+    <div>
+      <div class="result-taxin"><span id="total-in">0</span> 円</div>
+      <div class="result-taxin-label">税込</div>
+    </div>
+    <div class="result-divider"></div>
+    <div class="result-taxex-wrap">
+      <div class="result-taxex"><span id="total-ex">0</span> 円</div>
+      <div class="result-taxex-label">税抜</div>
+    </div>
+  </div>
+  <div class="result-items" id="result-items"></div>
+  <div class="memo-wrap">
+    <input class="memo-input" type="text" id="memo-input" placeholder="メモ（現場名・お客様名など）" maxlength="40">
+  </div>
+  <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled>
+    <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+    履歴に保存
+  </button>
+</div>
+</div>
+
+<!-- 履歴ページ -->
+<div class="page" id="page-history">
+  <div class="history-toolbar">
+    <button class="export-btn" onclick="exportCSV()">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      CSVで書き出す
+    </button>
+  </div>
+  <div class="history-main" id="history-list"></div>
+</div>
+
+<!-- 設定ページ -->
+<div class="page" id="page-settings">
+  <div class="settings-main">
+    <div class="settings-section">
+      <div class="settings-title">スプレッドシート連携</div>
+      <div class="settings-row">
+        <div class="settings-label">GAS WebアプリのURL</div>
+        <input class="settings-input" type="url" id="gas-url-input" value="https://script.google.com/macros/s/AKfycby3wVIxZC10PZFzFY28IZs3nTQlOtyddx-38FHyk7AgCalYneKcEqJp4TeZtyIxA7qK/exec" readonly style="color:#aaa;background:#f5f5f5;cursor:not-allowed">
+        <div class="settings-note">接続先は管理者が設定済みです。変更はできません。</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-label">担当者名</div>
+        <input class="name-input" type="text" id="staff-name-input" placeholder="例：小泉" maxlength="20">
+        <div class="settings-note">保存時にスプレッドシートの「端末ID」欄に記録されます。</div>
+      </div>
+      <div class="settings-row">
+        <button class="settings-save-btn" onclick="saveSettings()">設定を保存</button>
+      </div>
+    </div>
+    <div class="settings-section">
+      <div class="settings-title">接続状態</div>
+      <div class="status-row">
+        <span class="status-label">URL設定</span>
+        <span class="status-val" id="status-url">未設定</span>
+      </div>
+      <div class="status-row" style="border-top:1px solid #f5f5f5">
+        <span class="status-label">接続テスト</span>
+        <button class="test-btn" onclick="testConnection()">テスト送信</button>
+      </div>
+      <div class="status-row" style="border-top:1px solid #f5f5f5">
+        <span class="status-label">テスト結果</span>
+        <span class="status-val none" id="status-test">—</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ITEMS = {
+  'kabe':      { taxin: 8800,  label: '点検 壁掛け' },
+  'tenkase-t': { taxin: 13200, label: '点検 天カセ' },
+  'r32':       { taxin: 3850,  label: 'R32補填', unit:'100g', gas: true },
+  'r410a':     { taxin: 3850,  label: 'R410A補填', unit:'100g', gas: true },
+  'haikan':    { taxin: 19800, label: '配管修理', chk: true },
+  'chosa':     { taxin: 5500,  label: 'ガス漏れ調査', chk: true },
+  'normal':    { taxin: 16500, label: 'クリーニング ノーマル' },
+  'osoji':     { taxin: 33000, label: 'クリーニング お掃除機能付き' },
+  'tenkase-c': { taxin: 38500, label: 'クリーニング 天カセ' },
+  'mizu-n':    { taxin: 27500, label: '水漏れ修理 なし' },
+  'mizu-a':    { taxin: 36300, label: '水漏れ修理 付き' },
+  'inst':      { taxin: 19800, label: '標準取り付け工事' },
+  'removal':   { taxin: 8800,  label: '取外し撤去' },
+  'unso':      { taxin: 5500,  label: '運搬費', chk: true },
+  'kojo':      { taxin: 16500, label: '高所難所作業費', chk: true },
+  'pipe23':    { taxin: 3850,  label: '冷媒管 2分3分', unit:'m' },
+  'pipe24':    { taxin: 5500,  label: '冷媒管 2分4分', unit:'m' },
+  'pipe35':    { taxin: 7700,  label: '冷媒管 3分5分', unit:'m' },
+  'cable':     { taxin: 1100,  label: 'Fケーブル', unit:'m' },
+  'drain':     { taxin: 660,   label: 'ドレンホース', unit:'m' },
+  'hole-w':    { taxin: 5500,  label: '穴あけ 木造' },
+  'hole-m':    { taxin: 5500,  label: '穴あけ モルタル' },
+  'hole-rc':   { taxin: 11000, label: '穴あけ RC' },
+  'cover':     { taxin: 3300,  label: '化粧カバー', unit:'m' },
+};
+
+const qty = {};
+Object.keys(ITEMS).forEach(k => qty[k] = 0);
+const HIST_KEY = 'clover_history_v1';
+const SETTINGS_KEY = 'clover_settings_v1';
+const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycby3wVIxZC10PZFzFY28IZs3nTQlOtyddx-38FHyk7AgCalYneKcEqJp4TeZtyIxA7qK/exec';
+
+function fmt(n) { return n.toLocaleString('ja-JP'); }
+
+function changeQty(key, delta) {
+  qty[key] = Math.max(0, qty[key] + delta);
+  document.getElementById(key + '-qty').textContent = qty[key];
+  calcAll();
+}
+function getGasQty(key) {
+  const el = document.getElementById(key + '-qty');
+  return Math.max(0, parseInt(el ? el.value : 0) || 0);
+}
+
+let currentLines = [], currentTaxin = 0;
+
+function calcAll() {
+  let total = 0; const lines = [];
+  Object.entries(ITEMS).forEach(([key, item]) => {
+    let q = 0, sub = 0;
+    if (item.gas) {
+      q = getGasQty(key); sub = q * item.taxin;
+      const el = document.getElementById(key + '-price');
+      if (el) el.textContent = q > 0 ? fmt(sub) + '円' : '';
+    } else if (item.chk) {
+      const chk = document.getElementById(key);
+      if (chk && chk.checked) { q = 1; sub = item.taxin; }
+      const el = document.getElementById(key + '-price');
+      if (el) el.textContent = sub > 0 ? fmt(sub) + '円' : '';
+    } else {
+      q = qty[key] || 0; sub = q * item.taxin;
+      const el = document.getElementById(key + '-price');
+      if (el) el.textContent = q > 0 ? fmt(sub) + '円' : '';
+    }
+    if (sub > 0) {
+      total += sub;
+      const u = item.unit ? '×' + q + item.unit : (q > 1 ? '×' + q : '');
+      lines.push({ name: item.label + (u ? ' ' + u : ''), price: sub });
+    }
+  });
+  currentTaxin = total; currentLines = lines;
+  document.getElementById('total-in').textContent = fmt(total);
+  document.getElementById('total-ex').textContent = fmt(Math.round(total / 1.1));
+  document.getElementById('result-items').textContent = lines.map(l => l.name).join(' | ');
+  document.getElementById('save-btn').disabled = total === 0;
+}
+
+function resetAll() {
+  Object.keys(qty).forEach(k => {
+    qty[k] = 0;
+    const qEl = document.getElementById(k + '-qty');
+    if (qEl && qEl.tagName === 'SPAN') qEl.textContent = 0;
+    const pEl = document.getElementById(k + '-price');
+    if (pEl) pEl.textContent = '';
+  });
+  document.querySelectorAll('input[type=checkbox]').forEach(el => el.checked = false);
+  document.querySelectorAll('input.gas-input').forEach(el => el.value = 0);
+  document.getElementById('memo-input').value = '';
+  currentTaxin = 0; currentLines = [];
+  document.getElementById('total-in').textContent = '0';
+  document.getElementById('total-ex').textContent = '0';
+  document.getElementById('result-items').textContent = '';
+  document.getElementById('save-btn').disabled = true;
+  showToast('リセットしました');
+}
+
+// ===== localStorage =====
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch(e) { return []; }
+}
+function storeHistory(list) { localStorage.setItem(HIST_KEY, JSON.stringify(list)); }
+
+function loadSettings() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {};
+    if (!s.gasUrl) s.gasUrl = DEFAULT_GAS_URL;
+    return s;
+  } catch(e) { return { gasUrl: DEFAULT_GAS_URL }; }
+}
+function storeSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
+
+// ===== 保存 & GAS送信 =====
+async function saveRecord() {
+  if (currentTaxin === 0) return;
+  const settings = loadSettings();
+  const memo = document.getElementById('memo-input').value.trim();
+  const now = new Date();
+  const dateStr = now.getFullYear() + '/' +
+    String(now.getMonth()+1).padStart(2,'0') + '/' +
+    String(now.getDate()).padStart(2,'0') + ' ' +
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0');
+
+  const record = {
+    id: Date.now(),
+    date: dateStr,
+    memo: memo || '（メモなし）',
+    taxin: currentTaxin,
+    taxex: Math.round(currentTaxin / 1.1),
+    lines: currentLines.slice(),
+    deviceId: settings.staffName || '未設定',
+    syncStatus: 'pending'
+  };
+
+  const list = loadHistory();
+  list.unshift(record);
+  storeHistory(list);
+  updateHistoryCount();
+  showToast('保存しました');
+
+  // GAS送信
+  if (settings.gasUrl) {
+    await syncRecord(record);
+  }
+}
+
+async function syncRecord(record) {
+  const settings = loadSettings();
+  if (!settings.gasUrl) return;
+  try {
+    await fetch(settings.gasUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(record)
+    });
+    // no-corsではレスポンス本文を読めないが、エラーなければ成功とみなす
+    updateSyncStatus(record.id, 'ok');
+    showToast('スプレッドシートに送信しました');
+  } catch(err) {
+    updateSyncStatus(record.id, 'err');
+    showToast('送信失敗 — 後で再送できます');
+  }
+}
+
+function updateSyncStatus(id, status) {
+  const list = loadHistory();
+  const rec = list.find(r => r.id === id);
+  if (rec) { rec.syncStatus = status; storeHistory(list); }
+  renderHistory();
+}
+
+async function retrySend(id) {
+  const list = loadHistory();
+  const rec = list.find(r => r.id === id);
+  if (!rec) return;
+  showToast('再送信中…');
+  await syncRecord(rec);
+}
+
+function deleteRecord(id) {
+  storeHistory(loadHistory().filter(r => r.id !== id));
+  updateHistoryCount();
+  renderHistory();
+  showToast('削除しました');
+}
+
+function updateHistoryCount() {
+  const n = loadHistory().length;
+  document.getElementById('history-count').textContent = n > 0 ? '(' + n + ')' : '';
+}
+
+function renderHistory() {
+  const list = loadHistory();
+  const container = document.getElementById('history-list');
+  if (list.length === 0) {
+    container.innerHTML = '<div class="history-empty"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>保存された履歴はありません</div>';
+    return;
+  }
+  const syncLabel = { ok: '✓ 送信済み', err: '✗ 送信失敗', pending: '● 未送信' };
+  const syncClass = { ok: 'ok', err: 'err', pending: 'pending' };
+  container.innerHTML = list.map(r => {
+    const ss = r.syncStatus || 'pending';
+    const settings = loadSettings();
+    const hasUrl = !!settings.gasUrl;
+    const syncHtml = hasUrl
+      ? `<div class="history-sync ${syncClass[ss]}">${syncLabel[ss]}</div>` : '';
+    const retryHtml = (hasUrl && ss === 'err')
+      ? `<button class="retry-btn" onclick="retrySend(${r.id})">再送信</button>` : '';
+    return `
+    <div class="history-item">
+      <div class="history-head">
+        <div class="history-meta">
+          <div class="history-date">${r.date}　${esc(r.deviceId || '')}</div>
+          <div class="history-memo">${esc(r.memo)}</div>
+          ${syncHtml}
+        </div>
+        <div class="history-amounts">
+          <div class="history-taxin">${fmt(r.taxin)}円</div>
+          <div class="history-taxex">税抜 ${fmt(r.taxex)}円</div>
+        </div>
+      </div>
+      <div class="history-lines">
+        ${r.lines.map(l => `<div class="history-line"><span class="history-line-name">${esc(l.name)}</span><span class="history-line-price">${fmt(l.price)}円</span></div>`).join('')}
+      </div>
+      <div class="history-del">
+        ${retryHtml}
+        <button class="del-btn" onclick="deleteRecord(${r.id})">
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#ccc;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          削除
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportCSV() {
+  const list = loadHistory();
+  if (list.length === 0) { showToast('保存された履歴がありません'); return; }
+  const rows = [['日時', '担当者', 'メモ', '税込合計', '税抜合計', '内訳']];
+  list.forEach(r => {
+    const detail = r.lines.map(l => l.name + ' ' + fmt(l.price) + '円').join(' / ');
+    rows.push([r.date, r.deviceId || '', r.memo, r.taxin + '円', r.taxex + '円', detail]);
+  });
+  const bom = '\uFEFF';
+  const csv = bom + rows.map(row => row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const now = new Date();
+  a.href = url;
+  a.download = 'clover_ryokin_' + now.getFullYear() + String(now.getMonth()+1).padStart(2,'0') + String(now.getDate()).padStart(2,'0') + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('CSVを書き出しました');
+}
+
+// ===== 設定 =====
+function saveSettings() {
+  const name = document.getElementById('staff-name-input').value.trim();
+  storeSettings({ gasUrl: DEFAULT_GAS_URL, staffName: name });
+  updateStatusDisplay();
+  showToast('設定を保存しました');
+}
+
+function updateStatusDisplay() {
+  const s = loadSettings();
+  const urlEl = document.getElementById('status-url');
+  if (s.gasUrl) {
+    urlEl.textContent = '設定済み';
+    urlEl.className = 'status-val ok';
+  } else {
+    urlEl.textContent = '未設定';
+    urlEl.className = 'status-val none';
+  }
+  if (s.gasUrl) document.getElementById('gas-url-input').value = s.gasUrl;
+  if (s.staffName) document.getElementById('staff-name-input').value = s.staffName;
+}
+
+async function testConnection() {
+  const s = loadSettings();
+  const el = document.getElementById('status-test');
+  if (!s.gasUrl) { el.textContent = 'URLが未設定です'; el.className = 'status-val ng'; return; }
+  el.textContent = '送信中…'; el.className = 'status-val none';
+  try {
+    await fetch(s.gasUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date: 'テスト', memo: '接続テスト', taxin: 0, taxex: 0, lines: [], deviceId: s.staffName || 'テスト端末', syncStatus: 'test' })
+    });
+    el.textContent = '送信成功';
+    el.className = 'status-val ok';
+  } catch(err) {
+    el.textContent = '送信失敗';
+    el.className = 'status-val ng';
+  }
+}
+
+// ===== タブ =====
+function switchTab(tab) {
+  ['calc','history','settings'].forEach(t => {
+    document.getElementById('page-' + t).classList.toggle('active', t === tab);
+    document.getElementById('tab-' + t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'history') renderHistory();
+  if (tab === 'settings') updateStatusDisplay();
+}
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+updateHistoryCount();
+calcAll();
+</script>
+</body>
+</html>
