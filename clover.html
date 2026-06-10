@@ -112,6 +112,22 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 .name-input:focus{outline:2px solid #e07030;border-color:transparent}
 .pdf-btn{font-size:12px;color:#555;background:none;border:1px solid #e0e0e0;border-radius:6px;padding:4px 10px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
 .pdf-btn:active{background:#f5f5f5}
+.send-btn{font-size:12px;color:#4caf50;background:none;border:1px solid #4caf50;border-radius:6px;padding:4px 10px;cursor:pointer}
+.send-btn:active{background:#f1f8f1}
+.edit-btn{font-size:12px;color:#e07030;background:none;border:1px solid #e07030;border-radius:6px;padding:4px 10px;cursor:pointer}
+.edit-btn:active{background:#fff5f0}
+
+/* 編集モーダル */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:flex;align-items:flex-end}
+.modal-overlay.hidden{display:none}
+.modal-box{background:#fff;width:100%;border-radius:16px 16px 0 0;padding:20px 16px 32px;max-height:80vh;overflow-y:auto}
+.modal-title{font-size:16px;font-weight:600;color:#1a1a1a;margin-bottom:16px}
+.modal-label{font-size:12px;color:#888;margin-bottom:4px;margin-top:12px}
+.modal-input{width:100%;height:38px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:14px;color:#1a1a1a;background:#fff}
+.modal-input:focus{outline:2px solid #e07030;border-color:transparent}
+.modal-btns{display:flex;gap:8px;margin-top:20px}
+.modal-save{flex:1;padding:12px;background:#e07030;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
+.modal-cancel{padding:12px 20px;background:none;border:1px solid #e0e0e0;border-radius:10px;font-size:15px;cursor:pointer;color:#888}
 
 /* PDF印刷レイアウト */
 #print-area{display:none}
@@ -141,6 +157,30 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 <body>
 
 <div id="print-area"></div>
+
+<!-- 編集モーダル -->
+<div class="modal-overlay hidden" id="edit-modal">
+  <div class="modal-box">
+    <div class="modal-title">履歴を編集</div>
+    <div class="modal-label">メモ（現場名・お客様名）</div>
+    <input class="modal-input" type="text" id="edit-memo" maxlength="40">
+    <div class="modal-label">エラーコード</div>
+    <input class="modal-input" type="text" id="edit-error" maxlength="40">
+    <div class="modal-label">発注部品</div>
+    <input class="modal-input" type="text" id="edit-parts" maxlength="60">
+    <div class="modal-label">写真（機種・現場など）</div>
+    <div id="edit-photos" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+    <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px dashed #e0e0e0;border-radius:8px;cursor:pointer;font-size:13px;color:#888">
+      <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#aaa;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      写真を追加
+      <input type="file" accept="image/*" capture="environment" id="edit-photo-input" style="display:none" onchange="addPhoto(this)">
+    </label>
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeEditModal()">キャンセル</button>
+      <button class="modal-save" onclick="saveEdit()">保存</button>
+    </div>
+  </div>
+</div>
 
 <div class="tabs">
   <div class="tab active" id="tab-calc" onclick="switchTab('calc')">計算</div>
@@ -677,7 +717,7 @@ function loadSettings() {
 }
 function storeSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); }
 
-// ===== 保存 & GAS送信 =====
+// ===== 保存（ローカルのみ・GAS送信は手動） =====
 async function saveRecord() {
   if (currentTaxin === 0) return;
   const settings = loadSettings();
@@ -709,11 +749,6 @@ async function saveRecord() {
   storeHistory(list);
   updateHistoryCount();
   showToast('保存しました');
-
-  // GAS送信
-  if (settings.gasUrl) {
-    await syncRecord(record);
-  }
 }
 
 async function syncRecord(record) {
@@ -747,6 +782,103 @@ async function retrySend(id) {
   const rec = list.find(r => r.id === id);
   if (!rec) return;
   showToast('再送信中…');
+  await syncRecord(rec);
+}
+
+let editingId = null;
+let editingPhotos = [];
+
+function openEditModal(id) {
+  const r = loadHistory().find(rec => rec.id === id);
+  if (!r) return;
+  editingId = id;
+  editingPhotos = r.photos ? r.photos.slice() : [];
+  document.getElementById('edit-memo').value = r.memo === '（メモなし）' ? '' : r.memo;
+  document.getElementById('edit-error').value = r.errorCode || '';
+  document.getElementById('edit-parts').value = r.parts || '';
+  renderEditPhotos();
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+function renderEditPhotos() {
+  const wrap = document.getElementById('edit-photos');
+  wrap.innerHTML = editingPhotos.map((p, i) => `
+    <div style="position:relative;display:inline-block">
+      <img src="${p}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e0e0e0">
+      <button onclick="removePhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#e07030;border:none;color:#fff;font-size:12px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
+    </div>`).join('');
+}
+
+function addPhoto(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    // Canvasで圧縮
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.createElement('canvas');
+      const max = 800;
+      let w = img.width, h = img.height;
+      if (w > max || h > max) {
+        if (w > h) { h = Math.round(h * max / w); w = max; }
+        else { w = Math.round(w * max / h); h = max; }
+      }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      editingPhotos.push(canvas.toDataURL('image/jpeg', 0.7));
+      renderEditPhotos();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  input.value = '';
+}
+
+function removePhoto(index) {
+  editingPhotos.splice(index, 1);
+  renderEditPhotos();
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.add('hidden');
+  editingId = null;
+  editingPhotos = [];
+}
+
+function saveEdit() {
+  if (!editingId) return;
+  const list = loadHistory();
+  const rec = list.find(r => r.id === editingId);
+  if (!rec) return;
+  rec.memo = document.getElementById('edit-memo').value.trim() || '（メモなし）';
+  rec.errorCode = document.getElementById('edit-error').value.trim();
+  rec.parts = document.getElementById('edit-parts').value.trim();
+  rec.photos = editingPhotos.slice();
+  storeHistory(list);
+  closeEditModal();
+  renderHistory();
+  showToast('編集しました');
+}
+
+function viewPhoto(id, index) {
+  const r = loadHistory().find(rec => rec.id == id);
+  if (!r || !r.photos) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:400;display:flex;align-items:center;justify-content:center';
+  overlay.onclick = () => overlay.remove();
+  const img = document.createElement('img');
+  img.src = r.photos[index];
+  img.style.cssText = 'max-width:95vw;max-height:90vh;border-radius:8px;object-fit:contain';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+}
+
+async function sendRecord(id) {
+  const list = loadHistory();
+  const rec = list.find(r => r.id === id);
+  if (!rec) return;
+  showToast('送信中…');
   await syncRecord(rec);
 }
 
@@ -797,8 +929,14 @@ function renderHistory() {
       <div class="history-lines">
         ${r.lines.map(l => `<div class="history-line"><span class="history-line-name">${esc(l.name)}</span><span class="history-line-price">${fmt(l.price)}円</span></div>`).join('')}
       </div>
+      ${r.photos && r.photos.length > 0 ? `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid #f5f5f5">
+        ${r.photos.map((p,i) => `<img src="${p}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e0e0e0" onclick="viewPhoto('${r.id}',${i})">`).join('')}
+      </div>` : ''}
       <div class="history-del">
         ${retryHtml}
+        <button class="edit-btn" onclick="openEditModal(${r.id})">編集</button>
+        ${(hasUrl && ss !== 'ok') ? `<button class="send-btn" onclick="sendRecord(${r.id})">送信</button>` : ''}
         <button class="pdf-btn" onclick="printPDF(${r.id})">
           <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#555;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
           PDF
