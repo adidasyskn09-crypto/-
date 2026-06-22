@@ -128,6 +128,28 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 .modal-btns{display:flex;gap:8px;margin-top:20px}
 .modal-save{flex:1;padding:12px;background:#e07030;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer}
 .modal-cancel{padding:12px 20px;background:none;border:1px solid #e0e0e0;border-radius:10px;font-size:15px;cursor:pointer;color:#888}
+.pay-btn{height:36px;border:1px solid #e0e0e0;border-radius:8px;background:#fff;color:#888;font-size:13px;cursor:pointer}
+.pay-btn.active{background:#e07030;color:#fff;border-color:#e07030;font-weight:600}
+.week-card{background:#fff;border-radius:12px;margin:0 12px 10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.week-card-head{padding:11px 14px;background:#fff5f0;border-bottom:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between}
+.week-range{font-size:13px;font-weight:600;color:#1a1a1a}
+.week-count{font-size:11px;color:#aaa;margin-top:1px}
+.week-body{padding:10px 14px}
+.week-row{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;font-size:13px;color:#555;border-bottom:1px solid #f8f8f8}
+.week-row:last-child{border-bottom:none}
+.week-row-label{color:#888}
+.week-row-val{font-weight:600;color:#1a1a1a}
+.week-row-val.highlight{color:#e07030;font-size:16px}
+.week-row-val.receive{color:#4caf50;font-size:16px}
+.week-row-val.pay{color:#e57373;font-size:16px}
+.week-split-wrap{display:flex;gap:8px;margin-top:8px}
+.week-split-box{flex:1;border-radius:10px;padding:10px 12px}
+.week-split-box.receive-box{background:#f1f8f1;border:1px solid #c8e6c9}
+.week-split-box.pay-box{background:#fdf2f2;border:1px solid #f5c6c6}
+.week-split-box-label{font-size:11px;color:#888;margin-bottom:4px;line-height:1.4}
+.week-split-box-val{font-size:18px;font-weight:700}
+.week-split-box-val.receive{color:#4caf50}
+.week-split-box-val.pay{color:#e57373}
 
 /* PDF印刷レイアウト */
 #print-area{display:none}
@@ -168,6 +190,18 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
     <input class="modal-input" type="text" id="edit-error" maxlength="40">
     <div class="modal-label">発注部品</div>
     <input class="modal-input" type="text" id="edit-parts" maxlength="60">
+    <div class="modal-label">発注経費（税込）</div>
+    <input class="modal-input" type="number" id="edit-cost" min="0" oninput="updateEditSplitDisplay()">
+    <div class="modal-label">支払い方法</div>
+    <div style="display:flex;gap:6px">
+      <button type="button" class="pay-btn" id="edit-pay-card" onclick="setEditPayMethod('card')" style="flex:1">カード・請求書</button>
+      <button type="button" class="pay-btn" id="edit-pay-cash" onclick="setEditPayMethod('cash')" style="flex:1">現金</button>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:#fff5f0;border-radius:8px">
+      <div style="font-size:12px;color:#888;margin-bottom:4px" id="edit-split-label">受け取る金額（発注元から振り込まれる）</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:6px" id="edit-split-note">(税込合計 − 発注経費) × 30%</div>
+      <div style="font-size:20px;font-weight:700;color:#e07030" id="edit-split-amount">0円</div>
+    </div>
     <div class="modal-label">写真（機種・現場など）</div>
     <div id="edit-photos" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
     <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px dashed #e0e0e0;border-radius:8px;cursor:pointer;font-size:13px;color:#888">
@@ -535,12 +569,17 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 
 <!-- 履歴ページ -->
 <div class="page" id="page-history">
-  <div class="history-toolbar">
+  <div class="history-toolbar" style="justify-content:space-between;align-items:center">
+    <button class="export-btn" id="week-toggle-btn" onclick="toggleWeekSummary()" style="border-color:#e07030;color:#e07030">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      週次集計
+    </button>
     <button class="export-btn" onclick="exportCSV()">
       <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       CSVで書き出す
     </button>
   </div>
+  <div id="week-summary-area" style="display:none"></div>
   <div class="history-main" id="history-list"></div>
 </div>
 
@@ -734,6 +773,7 @@ async function saveRecord() {
   const record = {
     id: Date.now(),
     date: dateStr,
+    timestamp: now.toISOString(),
     memo: memo || '（メモなし）',
     errorCode: errorCode,
     parts: parts,
@@ -787,15 +827,39 @@ async function retrySend(id) {
 
 let editingId = null;
 let editingPhotos = [];
+let editingPayMethod = 'card';
+let editingTaxin = 0;
+
+function setEditPayMethod(method) {
+  editingPayMethod = method;
+  ['card','cash'].forEach(m => {
+    document.getElementById('edit-pay-' + m).classList.toggle('active', m === method);
+  });
+  updateEditSplitDisplay();
+}
+
+function updateEditSplitDisplay() {
+  const cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
+  const base = Math.max(0, editingTaxin - cost);
+  const isCash = editingPayMethod === 'cash';
+  const rate = isCash ? 0.7 : 0.3;
+  const amount = Math.round(base * rate);
+  document.getElementById('edit-split-label').textContent = isCash ? '支払う金額（Cloverから発注元へ振込）' : '受け取る金額（発注元から振り込まれる）';
+  document.getElementById('edit-split-note').textContent = '(税込合計 − 発注経費) × ' + (isCash ? '70' : '30') + '%';
+  document.getElementById('edit-split-amount').textContent = fmt(amount) + '円';
+}
 
 function openEditModal(id) {
   const r = loadHistory().find(rec => rec.id === id);
   if (!r) return;
   editingId = id;
   editingPhotos = r.photos ? r.photos.slice() : [];
+  editingTaxin = r.taxin || 0;
   document.getElementById('edit-memo').value = r.memo === '（メモなし）' ? '' : r.memo;
   document.getElementById('edit-error').value = r.errorCode || '';
   document.getElementById('edit-parts').value = r.parts || '';
+  document.getElementById('edit-cost').value = r.cost || 0;
+  setEditPayMethod(r.payMethod === 'cash' ? 'cash' : 'card');
   renderEditPhotos();
   document.getElementById('edit-modal').classList.remove('hidden');
 }
@@ -855,6 +919,10 @@ function saveEdit() {
   rec.errorCode = document.getElementById('edit-error').value.trim();
   rec.parts = document.getElementById('edit-parts').value.trim();
   rec.photos = editingPhotos.slice();
+  rec.cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
+  rec.payMethod = editingPayMethod;
+  const base = Math.max(0, (rec.taxin || 0) - rec.cost);
+  rec.splitAmount = Math.round(base * (editingPayMethod === 'cash' ? 0.7 : 0.3));
   storeHistory(list);
   closeEditModal();
   renderHistory();
@@ -903,6 +971,7 @@ function renderHistory() {
   }
   const syncLabel = { ok: '✓ 送信済み', err: '✗ 送信失敗', pending: '● 未送信' };
   const syncClass = { ok: 'ok', err: 'err', pending: 'pending' };
+  const payLabel = { card: 'カード・請求書払い', cash: '現金払い' };
   container.innerHTML = list.map(r => {
     const ss = r.syncStatus || 'pending';
     const settings = loadSettings();
@@ -928,7 +997,13 @@ function renderHistory() {
       </div>
       <div class="history-lines">
         ${r.lines.map(l => `<div class="history-line"><span class="history-line-name">${esc(l.name)}</span><span class="history-line-price">${fmt(l.price)}円</span></div>`).join('')}
+        ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">発注経費</span><span class="history-line-price" style="color:#aaa">−${fmt(r.cost)}円</span></div>` : ''}
       </div>
+      ${r.splitAmount != null ? `
+      <div style="padding:10px 14px;border-top:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;background:#fffaf6">
+        <span style="font-size:12px;color:#888">${payLabel[r.payMethod === 'cash' ? 'cash' : 'card']}　${r.payMethod === 'cash' ? '→ 発注元へ支払い70%' : '→ 発注元から受取30%'}</span>
+        <span style="font-size:15px;font-weight:700;color:#e07030">${fmt(r.splitAmount)}円</span>
+      </div>` : ''}
       ${r.photos && r.photos.length > 0 ? `
       <div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 14px;border-top:1px solid #f5f5f5">
         ${r.photos.map((p,i) => `<img src="${p}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:1px solid #e0e0e0" onclick="viewPhoto('${r.id}',${i})">`).join('')}
@@ -1011,13 +1086,99 @@ function printPDF(id) {
   window.print();
 }
 
+// ===== 週次集計（日曜始まり・土曜締） =====
+let weekSummaryVisible = false;
+
+function toggleWeekSummary() {
+  weekSummaryVisible = !weekSummaryVisible;
+  document.getElementById('week-summary-area').style.display = weekSummaryVisible ? 'block' : 'none';
+  if (weekSummaryVisible) renderWeekSummary();
+}
+
+function parseRecordDate(r) {
+  if (r.timestamp) return new Date(r.timestamp);
+  // "2026/06/22 18:30" 形式をパース
+  if (r.date) {
+    const m = r.date.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if (m) return new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
+  }
+  return new Date(r.id || Date.now());
+}
+
+function getWeekRange(d) {
+  const date = new Date(d);
+  date.setHours(0,0,0,0);
+  const day = date.getDay();
+  const sunday = new Date(date);
+  sunday.setDate(date.getDate() - day);
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
+  return { start: sunday, end: saturday };
+}
+
+function fmtMD(d) {
+  return (d.getMonth()+1) + '/' + d.getDate();
+}
+
+function renderWeekSummary() {
+  const list = loadHistory();
+  const area = document.getElementById('week-summary-area');
+  if (list.length === 0) {
+    area.innerHTML = '<div class="history-empty" style="padding:30px 20px">週次集計の対象データがありません</div>';
+    return;
+  }
+  const groups = {};
+  list.forEach(r => {
+    const d = parseRecordDate(r);
+    const { start, end } = getWeekRange(d);
+    const key = start.toISOString().slice(0,10);
+    if (!groups[key]) groups[key] = { start, end, records: [] };
+    groups[key].records.push(r);
+  });
+  const keys = Object.keys(groups).sort().reverse();
+  area.innerHTML = keys.map(key => {
+    const g = groups[key];
+    let taxinTotal = 0, costTotal = 0, receiveTotal = 0, payTotal = 0, cardCount = 0, cashCount = 0;
+    g.records.forEach(r => {
+      taxinTotal += r.taxin || 0;
+      costTotal += r.cost || 0;
+      if (r.payMethod === 'cash') { cashCount++; payTotal += (r.splitAmount || 0); }
+      else { cardCount++; receiveTotal += (r.splitAmount || 0); }
+    });
+    return `
+    <div class="week-card">
+      <div class="week-card-head">
+        <div>
+          <div class="week-range">${fmtMD(g.start)}（日）〜 ${fmtMD(g.end)}（土）</div>
+          <div class="week-count">${g.records.length}件　カード/請求書 ${cardCount}件・現金 ${cashCount}件</div>
+        </div>
+      </div>
+      <div class="week-body">
+        <div class="week-row"><span class="week-row-label">税込合計</span><span class="week-row-val">${fmt(taxinTotal)}円</span></div>
+        <div class="week-row"><span class="week-row-label">発注経費合計</span><span class="week-row-val">−${fmt(costTotal)}円</span></div>
+        <div class="week-split-wrap">
+          <div class="week-split-box receive-box">
+            <div class="week-split-box-label">発注元から受取<br>（カード・請求書）</div>
+            <div class="week-split-box-val receive">+${fmt(receiveTotal)}円</div>
+          </div>
+          <div class="week-split-box pay-box">
+            <div class="week-split-box-label">Cloverから支払<br>（現金）</div>
+            <div class="week-split-box-val pay">−${fmt(payTotal)}円</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function exportCSV() {
   const list = loadHistory();
   if (list.length === 0) { showToast('保存された履歴がありません'); return; }
-  const rows = [['日時', '担当者', 'メモ', '税込合計', '税抜合計', '内訳']];
+  const payLabelMap = { card: 'カード・請求書', cash: '現金' };
+  const rows = [['日時', '担当者', 'メモ', '税込合計', '税抜合計', '発注経費', '支払い方法', '振込額', '内訳']];
   list.forEach(r => {
     const detail = r.lines.map(l => l.name + ' ' + fmt(l.price) + '円').join(' / ');
-    rows.push([r.date, r.deviceId || '', r.memo, r.taxin + '円', r.taxex + '円', detail]);
+    rows.push([r.date, r.deviceId || '', r.memo, r.taxin + '円', r.taxex + '円', (r.cost || 0) + '円', payLabelMap[r.payMethod === 'cash' ? 'cash' : 'card'] || '', (r.splitAmount != null ? r.splitAmount + '円' : ''), detail]);
   });
   const bom = '\uFEFF';
   const csv = bom + rows.map(row => row.map(cell => '"' + String(cell).replace(/"/g, '""') + '"').join(',')).join('\r\n');
@@ -1080,7 +1241,10 @@ function switchTab(tab) {
     document.getElementById('page-' + t).classList.toggle('active', t === tab);
     document.getElementById('tab-' + t).classList.toggle('active', t === tab);
   });
-  if (tab === 'history') renderHistory();
+  if (tab === 'history') {
+    renderHistory();
+    if (weekSummaryVisible) renderWeekSummary();
+  }
   if (tab === 'settings') updateStatusDisplay();
 }
 
