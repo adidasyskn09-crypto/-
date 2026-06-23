@@ -173,6 +173,34 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
   .p-memo{font-size:9pt;color:#888;margin-bottom:4mm}
   .p-notes{font-size:9pt;color:#aaa;border-top:1px solid #e0e0e0;padding-top:3mm;line-height:1.8}
   .p-staff{font-size:9pt;color:#888;margin-top:4mm;text-align:right}
+  .p-page{page-break-after:always}
+  .p-page:last-child{page-break-after:auto}
+  .p-section-label{font-size:11pt;font-weight:600;color:#e07030;margin-bottom:3mm;padding-bottom:2mm;border-bottom:1px solid #f0d8c8}
+
+  /* 見積書（御見積書）専用デザイン */
+  .q-title-bar{background:#e07030;color:#fff;text-align:center;padding:4mm 0;font-size:18pt;font-weight:700;letter-spacing:0.3em;margin-bottom:10mm}
+  .q-parties{display:flex;justify-content:space-between;margin-bottom:8mm}
+  .q-to{font-size:13pt;font-weight:700;border-bottom:2px solid #1a1a1a;padding-bottom:1mm;margin-bottom:3mm;display:inline-block}
+  .q-to-detail{font-size:9pt;color:#555;line-height:1.6}
+  .q-from{text-align:right;font-size:9pt;color:#555;line-height:1.7}
+  .q-from-name{font-size:12pt;font-weight:700;color:#e07030;margin-bottom:2mm}
+  .q-meta{font-size:9pt;color:#555;text-align:right;margin-bottom:6mm;line-height:1.7}
+  .q-meta-row{display:flex;justify-content:flex-end;gap:4mm}
+  .q-meta-label{color:#888}
+  .q-amount-box{display:flex;align-items:center;background:#fafafa;border:1px solid #e0e0e0;border-radius:2mm;margin-bottom:6mm;overflow:hidden}
+  .q-amount-label{background:#e07030;color:#fff;font-size:11pt;font-weight:700;padding:4mm 6mm;white-space:nowrap}
+  .q-amount-value{font-size:20pt;font-weight:700;color:#1a1a1a;padding:4mm 6mm}
+  .q-table{width:100%;border-collapse:collapse;margin-bottom:6mm}
+  .q-table th{background:#e07030;color:#fff;padding:2.5mm 3mm;font-size:10pt;text-align:left;font-weight:600}
+  .q-table td{padding:2.5mm 3mm;font-size:10pt;border-bottom:0.5px solid #e8e8e8}
+  .q-table td.price{text-align:right}
+  .q-bottom{display:flex;justify-content:space-between;gap:8mm;margin-bottom:6mm}
+  .q-validity{font-size:8.5pt;color:#888}
+  .q-total-table{border:1px solid #e0e0e0;border-radius:2mm;overflow:hidden;min-width:55mm}
+  .q-total-row{display:flex;justify-content:space-between;padding:2mm 4mm;font-size:10pt;background:#fafafa;border-bottom:0.5px solid #e8e8e8}
+  .q-total-row:last-child{border-bottom:none;background:#fff5f0}
+  .q-total-row.main span:last-child{font-size:13pt;font-weight:700;color:#e07030}
+  .q-remarks{font-size:8.5pt;color:#888;border-top:1px solid #e0e0e0;padding-top:3mm;line-height:1.8}
 }
 </style>
 </head>
@@ -184,8 +212,8 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 <div class="modal-overlay hidden" id="edit-modal">
   <div class="modal-box">
     <div class="modal-title">履歴を編集</div>
-    <div class="modal-label">メモ（現場名・お客様名）</div>
-    <input class="modal-input" type="text" id="edit-memo" maxlength="40">
+    <div class="modal-label">お客様名（個人の場合は様・法人の場合は御中をつけてください）</div>
+    <input class="modal-input" type="text" id="edit-memo" maxlength="40" placeholder="例：〇〇様／株式会社〇〇御中">
     <div class="modal-label">エラーコード</div>
     <input class="modal-input" type="text" id="edit-error" maxlength="40">
     <div class="modal-label">発注部品</div>
@@ -579,7 +607,19 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
       CSVで書き出す
     </button>
   </div>
-  <div id="week-summary-area" style="display:none"></div>
+  <div id="week-summary-area" style="display:none">
+    <div style="padding:0 12px 10px;display:flex;gap:8px">
+      <button class="export-btn" onclick="printClientPDFCard()" style="flex:1;justify-content:center;border-color:#4caf50;color:#4caf50">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        カード・請求書分PDF（先週）
+      </button>
+      <button class="export-btn" onclick="printClientPDFCash()" style="flex:1;justify-content:center;border-color:#e57373;color:#e57373">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        現金分PDF（今週）
+      </button>
+    </div>
+    <div id="week-cards-list"></div>
+  </div>
   <div class="history-main" id="history-list"></div>
 </div>
 
@@ -843,9 +883,9 @@ function updateEditSplitDisplay() {
   const base = Math.max(0, editingTaxin - cost);
   const isCash = editingPayMethod === 'cash';
   const rate = isCash ? 0.7 : 0.3;
-  const amount = Math.round(base * rate);
+  const amount = isCash ? Math.round(base * rate) : Math.round(base * rate) + cost;
   document.getElementById('edit-split-label').textContent = isCash ? '支払う金額（Cloverから発注元へ振込）' : '受け取る金額（発注元から振り込まれる）';
-  document.getElementById('edit-split-note').textContent = '(税込合計 − 発注経費) × ' + (isCash ? '70' : '30') + '%';
+  document.getElementById('edit-split-note').textContent = isCash ? '(税込合計 − 発注経費) × 70%' : '(税込合計 − 発注経費) × 30% + 発注経費';
   document.getElementById('edit-split-amount').textContent = fmt(amount) + '円';
 }
 
@@ -922,7 +962,9 @@ function saveEdit() {
   rec.cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
   rec.payMethod = editingPayMethod;
   const base = Math.max(0, (rec.taxin || 0) - rec.cost);
-  rec.splitAmount = Math.round(base * (editingPayMethod === 'cash' ? 0.7 : 0.3));
+  rec.splitAmount = editingPayMethod === 'cash'
+    ? Math.round(base * 0.7)
+    : Math.round(base * 0.3) + rec.cost;
   storeHistory(list);
   closeEditModal();
   renderHistory();
@@ -998,6 +1040,7 @@ function renderHistory() {
       <div class="history-lines">
         ${r.lines.map(l => `<div class="history-line"><span class="history-line-name">${esc(l.name)}</span><span class="history-line-price">${fmt(l.price)}円</span></div>`).join('')}
         ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">発注経費</span><span class="history-line-price" style="color:#aaa">−${fmt(r.cost)}円</span></div>` : ''}
+        ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">対象金額（税込合計−発注経費）</span><span class="history-line-price" style="color:#aaa">${fmt(Math.max(0,(r.taxin||0)-r.cost))}円</span></div>` : ''}
       </div>
       ${r.splitAmount != null ? `
       <div style="padding:10px 14px;border-top:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;background:#fffaf6">
@@ -1038,50 +1081,56 @@ function printPDF(id) {
       <td class="price">${fmt(l.price)}円</td>
     </tr>`).join('');
   const memoHtml = (r.errorCode || r.parts) ? `
-    <div class="p-memo">
+    <div class="q-remarks" style="margin-bottom:4mm;border-top:none;padding-top:0">
       ${r.errorCode ? `エラーコード：${esc(r.errorCode)}　` : ''}
       ${r.parts ? `発注部品：${esc(r.parts)}` : ''}
     </div>` : '';
+  const issueDate = r.date ? r.date.split(' ')[0] : '';
+
   document.getElementById('print-area').innerHTML = `
-    <div class="p-header">
-      <div class="p-company">株式会社Clover</div>
+    <div class="q-title-bar">御　見　積　書</div>
+    <div class="q-parties">
       <div>
-        <div class="p-doc-type">御見積書</div>
-        <div class="p-date">${r.date}</div>
+        <div class="q-to">${esc(r.memo)}</div>
+        <div class="q-to-detail">下記の通りお見積り申し上げます。</div>
+      </div>
+      <div class="q-from">
+        <div class="q-from-name">株式会社Clover</div>
+        〒231-0046<br>
+        神奈川県横浜市中区福富町39-1<br>
+        デュオステージ横濱桜木町506<br>
+        TEL：090-9449-9608
+        ${staffName ? `<br>担当：${esc(staffName)}` : ''}
       </div>
     </div>
-    <div class="p-to">${esc(r.memo)}　御中</div>
-    <table class="p-table">
+    <div class="q-meta">
+      <div class="q-meta-row"><span class="q-meta-label">発行日：</span><span>${esc(issueDate)}</span></div>
+      <div class="q-meta-row"><span class="q-meta-label">見積番号：</span><span>${String(r.id).slice(-6)}</span></div>
+    </div>
+    <div class="q-amount-box">
+      <div class="q-amount-label">お見積金額</div>
+      <div class="q-amount-value">${fmt(r.taxin)}円</div>
+    </div>
+    <table class="q-table">
       <thead>
         <tr>
-          <th style="width:55%">項目</th>
-          <th style="width:15%">税抜金額</th>
-          <th style="width:15%">消費税</th>
-          <th style="width:15%">税込金額</th>
+          <th style="width:52%">項目</th>
+          <th style="width:16%">税抜金額</th>
+          <th style="width:16%">消費税</th>
+          <th style="width:16%">税込金額</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <div class="p-total-wrap">
-      <div class="p-total-row">
-        <span class="p-total-label">税抜合計</span>
-        <span class="p-total-val">${fmt(r.taxex)}円</span>
-      </div>
-      <div class="p-total-row">
-        <span class="p-total-label">消費税（10%）</span>
-        <span class="p-total-val">${fmt(r.taxin - r.taxex)}円</span>
-      </div>
-      <div class="p-total-row">
-        <span class="p-total-label">税込合計</span>
-        <span class="p-total-main">${fmt(r.taxin)}円</span>
+    <div class="q-bottom">
+      <div class="q-validity">※ 設置状況や機種によって料金が異なる場合があります。<br>※ 駐車場代が別途発生する場合があります。</div>
+      <div class="q-total-table">
+        <div class="q-total-row"><span>税抜合計</span><span>${fmt(r.taxex)}円</span></div>
+        <div class="q-total-row"><span>消費税（10%）</span><span>${fmt(r.taxin - r.taxex)}円</span></div>
+        <div class="q-total-row main"><span>合計（税込）</span><span>${fmt(r.taxin)}円</span></div>
       </div>
     </div>
     ${memoHtml}
-    <div class="p-notes">
-      ※ 設置状況や機種によって料金が異なる場合があります。<br>
-      ※ 駐車場代が別途発生する場合があります。
-    </div>
-    ${staffName ? `<div class="p-staff">担当：${esc(staffName)}</div>` : ''}
   `;
   window.print();
 }
@@ -1122,7 +1171,7 @@ function fmtMD(d) {
 
 function renderWeekSummary() {
   const list = loadHistory();
-  const area = document.getElementById('week-summary-area');
+  const area = document.getElementById('week-cards-list');
   if (list.length === 0) {
     area.innerHTML = '<div class="history-empty" style="padding:30px 20px">週次集計の対象データがありません</div>';
     return;
@@ -1135,6 +1184,7 @@ function renderWeekSummary() {
     if (!groups[key]) groups[key] = { start, end, records: [] };
     groups[key].records.push(r);
   });
+  weekGroupsCache = groups;
   const keys = Object.keys(groups).sort().reverse();
   area.innerHTML = keys.map(key => {
     const g = groups[key];
@@ -1169,6 +1219,98 @@ function renderWeekSummary() {
       </div>
     </div>`;
   }).join('');
+}
+
+let weekGroupsCache = {};
+
+function buildWeekTable(g) {
+  const payLabelMap = { card: 'カード・請求書', cash: '現金' };
+  let taxinTotal = 0, costTotal = 0, splitTotal = 0, baseTotal = 0;
+  const rows = g.records.map(r => {
+    const isCash = r.payMethod === 'cash';
+    taxinTotal += r.taxin || 0;
+    costTotal += r.cost || 0;
+    baseTotal += Math.max(0, (r.taxin || 0) - (r.cost || 0));
+    splitTotal += (r.splitAmount || 0);
+    return `
+    <tr>
+      <td>${esc(r.date)}</td>
+      <td>${esc(r.memo)}</td>
+      <td>${payLabelMap[isCash ? 'cash' : 'card']}</td>
+      <td class="price">${fmt(r.taxin)}円</td>
+      <td class="price">${fmt(r.cost || 0)}円</td>
+      <td class="price">${fmt(r.splitAmount || 0)}円</td>
+    </tr>`;
+  }).join('');
+  return { rows, taxinTotal, costTotal, splitTotal, baseTotal };
+}
+
+function buildClientPDFPage(g, sectionLabel, totalColor, totalLabel) {
+  const t = buildWeekTable(g);
+  return `
+    <div class="p-page">
+      <div class="p-header">
+        <div class="p-company">株式会社Clover</div>
+        <div>
+          <div class="p-doc-type">週次集計表</div>
+          <div class="p-date">${fmtMD(g.start)}（日）〜 ${fmtMD(g.end)}（土）</div>
+        </div>
+      </div>
+      <div class="p-section-label">${sectionLabel}（${g.records.length}件）</div>
+      <table class="p-table">
+        <thead>
+          <tr>
+            <th style="width:16%">日時</th>
+            <th style="width:22%">メモ</th>
+            <th style="width:14%">支払方法</th>
+            <th style="width:16%">税込合計</th>
+            <th style="width:16%">発注経費</th>
+            <th style="width:16%">振込額</th>
+          </tr>
+        </thead>
+        <tbody>${t.rows || '<tr><td colspan="6" style="text-align:center;color:#aaa">対象データなし</td></tr>'}</tbody>
+      </table>
+      <div class="p-total-wrap">
+        <div class="p-total-row"><span class="p-total-label">税込合計</span><span class="p-total-val">${fmt(t.taxinTotal)}円</span></div>
+        <div class="p-total-row"><span class="p-total-label">発注経費合計</span><span class="p-total-val">${fmt(t.costTotal)}円</span></div>
+        <div class="p-total-row"><span class="p-total-label">対象金額（税込合計−発注経費）</span><span class="p-total-val">${fmt(t.baseTotal)}円</span></div>
+        <div class="p-total-row"><span class="p-total-label">${totalLabel}</span><span class="p-total-main" style="color:${totalColor}">${fmt(t.splitTotal)}円</span></div>
+      </div>
+    </div>`;
+}
+
+function printClientPDFCard() {
+  const now = new Date();
+  const { start: thisStart, end: thisEnd } = getWeekRange(now);
+  const lastStart = new Date(thisStart); lastStart.setDate(thisStart.getDate() - 7);
+  const lastEnd = new Date(thisEnd); lastEnd.setDate(thisEnd.getDate() - 7);
+
+  const list = loadHistory();
+  const inRange = (r, start, end) => {
+    const d = parseRecordDate(r);
+    return d >= start && d <= new Date(end.getTime() + 24*60*60*1000 - 1);
+  };
+
+  const cardLastWeek = { start: lastStart, end: lastEnd, records: list.filter(r => inRange(r, lastStart, lastEnd) && r.payMethod !== 'cash') };
+
+  document.getElementById('print-area').innerHTML = buildClientPDFPage(cardLastWeek, 'カード・請求書払い分', '#4caf50', '振込合計（受取）');
+  window.print();
+}
+
+function printClientPDFCash() {
+  const now = new Date();
+  const { start: thisStart, end: thisEnd } = getWeekRange(now);
+
+  const list = loadHistory();
+  const inRange = (r, start, end) => {
+    const d = parseRecordDate(r);
+    return d >= start && d <= new Date(end.getTime() + 24*60*60*1000 - 1);
+  };
+
+  const cashThisWeek = { start: thisStart, end: thisEnd, records: list.filter(r => inRange(r, thisStart, thisEnd) && r.payMethod === 'cash') };
+
+  document.getElementById('print-area').innerHTML = buildClientPDFPage(cashThisWeek, '現金払い分', '#e57373', '振込合計（支払）');
+  window.print();
 }
 
 function exportCSV() {
