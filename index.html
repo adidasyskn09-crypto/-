@@ -155,7 +155,7 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 #print-area{display:none}
 @media print{
   body > *{display:none !important}
-  #print-area{display:block !important;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;color:#1a1a1a;padding:20mm 15mm}
+  #print-area{display:block !important;font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Noto Sans JP',sans-serif;color:#1a1a1a;padding:15mm 15mm}
   .p-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8mm;border-bottom:2px solid #e07030;padding-bottom:4mm}
   .p-company{font-size:18pt;font-weight:700;color:#e07030}
   .p-doc-type{font-size:22pt;font-weight:700;text-align:right;color:#1a1a1a}
@@ -201,6 +201,10 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
   .q-total-row:last-child{border-bottom:none;background:#fff5f0}
   .q-total-row.main span:last-child{font-size:13pt;font-weight:700;color:#e07030}
   .q-remarks{font-size:8.5pt;color:#888;border-top:1px solid #e0e0e0;padding-top:3mm;line-height:1.8}
+  .q-photos{margin-top:4mm}
+  .q-photos-label{font-size:9pt;font-weight:600;color:#888;margin-bottom:2mm}
+  .q-photo-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm}
+  .q-photo-grid img{width:100%;height:28mm;object-fit:cover;border-radius:1.5mm;border:0.5px solid #ddd}
 }
 </style>
 </head>
@@ -230,12 +234,14 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
       <div style="font-size:11px;color:#aaa;margin-bottom:6px" id="edit-split-note">(税込合計 − 発注経費) × 30%</div>
       <div style="font-size:20px;font-weight:700;color:#e07030" id="edit-split-amount">0円</div>
     </div>
+    <div class="modal-label">作業コメント</div>
+    <textarea class="modal-input" id="edit-comment" maxlength="300" rows="3" style="height:auto;padding:8px 10px;resize:vertical;font-family:inherit" placeholder="作業内容・気づいた点など"></textarea>
     <div class="modal-label">写真（機種・現場など）</div>
     <div id="edit-photos" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
     <label style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px dashed #e0e0e0;border-radius:8px;cursor:pointer;font-size:13px;color:#888">
       <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:#aaa;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
       写真を追加
-      <input type="file" accept="image/*" capture="environment" id="edit-photo-input" style="display:none" onchange="addPhoto(this)">
+      <input type="file" accept="image/*" id="edit-photo-input" style="display:none" onchange="addPhoto(this)">
     </label>
     <div class="modal-btns">
       <button class="modal-cancel" onclick="closeEditModal()">キャンセル</button>
@@ -898,6 +904,7 @@ function openEditModal(id) {
   document.getElementById('edit-memo').value = r.memo === '（メモなし）' ? '' : r.memo;
   document.getElementById('edit-error').value = r.errorCode || '';
   document.getElementById('edit-parts').value = r.parts || '';
+  document.getElementById('edit-comment').value = r.comment || '';
   document.getElementById('edit-cost').value = r.cost || 0;
   setEditPayMethod(r.payMethod === 'cash' ? 'cash' : 'card');
   renderEditPhotos();
@@ -958,6 +965,7 @@ function saveEdit() {
   rec.memo = document.getElementById('edit-memo').value.trim() || '（メモなし）';
   rec.errorCode = document.getElementById('edit-error').value.trim();
   rec.parts = document.getElementById('edit-parts').value.trim();
+  rec.comment = document.getElementById('edit-comment').value.trim();
   rec.photos = editingPhotos.slice();
   rec.cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
   rec.payMethod = editingPayMethod;
@@ -1030,6 +1038,7 @@ function renderHistory() {
           <div class="history-memo">${esc(r.memo)}</div>
           ${r.errorCode ? `<div style="font-size:12px;color:#e07030;margin-top:2px">🔧 ${esc(r.errorCode)}</div>` : ''}
           ${r.parts ? `<div style="font-size:12px;color:#888;margin-top:2px">📦 ${esc(r.parts)}</div>` : ''}
+          ${r.comment ? `<div style="font-size:12px;color:#888;margin-top:2px">📝 ${esc(r.comment)}</div>` : ''}
           ${syncHtml}
         </div>
         <div class="history-amounts">
@@ -1055,9 +1064,13 @@ function renderHistory() {
         ${retryHtml}
         <button class="edit-btn" onclick="openEditModal(${r.id})">編集</button>
         ${(hasUrl && ss !== 'ok') ? `<button class="send-btn" onclick="sendRecord(${r.id})">送信</button>` : ''}
-        <button class="pdf-btn" onclick="printPDF(${r.id})">
+        <button class="pdf-btn" onclick="printInvoicePDF(${r.id})">
           <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#555;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-          PDF
+          請求書PDF
+        </button>
+        <button class="pdf-btn" onclick="printReportPDF(${r.id})">
+          <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#555;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          報告書PDF
         </button>
         <button class="del-btn" onclick="deleteRecord(${r.id})">
           <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#ccc;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
@@ -1068,18 +1081,98 @@ function renderHistory() {
   }).join('');
 }
 
-function printPDF(id) {
-  const r = loadHistory().find(rec => rec.id === id);
-  if (!r) return;
-  const settings = loadSettings();
-  const staffName = settings.staffName || '';
-  const rows = r.lines.map(l => `
+function buildPDFRows(r) {
+  return r.lines.map(l => `
     <tr>
       <td>${esc(l.name)}</td>
       <td class="price">${fmt(Math.round(l.price / 1.1))}円</td>
       <td class="price">${fmt(l.price - Math.round(l.price / 1.1))}円</td>
       <td class="price">${fmt(l.price)}円</td>
     </tr>`).join('');
+}
+
+function printReportPDF(id) {
+  const r = loadHistory().find(rec => rec.id === id);
+  if (!r) return;
+  const settings = loadSettings();
+  const staffName = settings.staffName || '';
+  const rows = buildPDFRows(r);
+  const payLabelMap = { card: 'カード・請求書', cash: '現金' };
+  const payLabel = payLabelMap[r.payMethod === 'cash' ? 'cash' : 'card'];
+  const remarksHtml = (r.errorCode || r.parts) ? `
+    <div class="q-remarks" style="margin-bottom:4mm;border-top:none;padding-top:0">
+      ${r.errorCode ? `エラーコード：${esc(r.errorCode)}　` : ''}
+      ${r.parts ? `発注部品：${esc(r.parts)}` : ''}
+    </div>` : '';
+  const commentHtml = r.comment ? `
+    <div class="q-photos">
+      <div class="q-photos-label">作業コメント</div>
+      <div style="font-size:9.5pt;color:#333;line-height:1.7;white-space:pre-wrap">${esc(r.comment)}</div>
+    </div>` : '';
+  const photosHtml = (r.photos && r.photos.length > 0) ? `
+    <div class="q-photos">
+      <div class="q-photos-label">作業写真</div>
+      <div class="q-photo-grid">
+        ${r.photos.map(p => `<img src="${p}">`).join('')}
+      </div>
+    </div>` : '';
+  const issueDate = r.date ? r.date.split(' ')[0] : '';
+
+  document.getElementById('print-area').innerHTML = `
+    <div class="q-title-bar" style="padding:3mm 0;margin-bottom:6mm;font-size:16pt">作業（点検）報告書</div>
+    <div class="q-parties" style="margin-bottom:5mm">
+      <div>
+        <div class="q-to">株式会社ベルナル御中</div>
+        <div class="q-to-detail">下記の通り作業報告いたします。</div>
+      </div>
+      <div class="q-from">
+        <div class="q-from-name">株式会社Clover</div>
+        ${staffName ? `担当：${esc(staffName)}` : ''}
+      </div>
+    </div>
+    <div class="q-meta" style="margin-bottom:4mm">
+      <div class="q-meta-row"><span class="q-meta-label">発行日：</span><span>${esc(issueDate)}</span></div>
+      <div class="q-meta-row"><span class="q-meta-label">報告番号：</span><span>${String(r.id).slice(-6)}</span></div>
+      <div class="q-meta-row"><span class="q-meta-label">お客様：</span><span>${esc(r.memo)}</span></div>
+    </div>
+    <div class="q-amount-box" style="margin-bottom:4mm">
+      <div class="q-amount-label">作業（点検）費用</div>
+      <div class="q-amount-value">${fmt(r.taxin)}円</div>
+    </div>
+    <table class="q-table" style="margin-bottom:4mm">
+      <thead>
+        <tr>
+          <th style="width:52%">項目</th>
+          <th style="width:16%">税抜金額</th>
+          <th style="width:16%">消費税</th>
+          <th style="width:16%">税込金額</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="q-bottom" style="margin-bottom:4mm">
+      <div class="q-validity">
+        決済方法：${payLabel}
+      </div>
+      <div class="q-total-table">
+        <div class="q-total-row"><span>税抜合計</span><span>${fmt(r.taxex)}円</span></div>
+        <div class="q-total-row"><span>消費税（10%）</span><span>${fmt(r.taxin - r.taxex)}円</span></div>
+        <div class="q-total-row main"><span>合計（税込）</span><span>${fmt(r.taxin)}円</span></div>
+      </div>
+    </div>
+    ${remarksHtml}
+    ${photosHtml}
+    ${commentHtml}
+  `;
+  window.print();
+}
+
+function printInvoicePDF(id) {
+  const r = loadHistory().find(rec => rec.id === id);
+  if (!r) return;
+  const settings = loadSettings();
+  const staffName = settings.staffName || '';
+  const rows = buildPDFRows(r);
   const memoHtml = (r.errorCode || r.parts) ? `
     <div class="q-remarks" style="margin-bottom:4mm;border-top:none;padding-top:0">
       ${r.errorCode ? `エラーコード：${esc(r.errorCode)}　` : ''}
