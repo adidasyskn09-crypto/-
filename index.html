@@ -1091,6 +1091,18 @@ function buildPDFRows(r) {
     </tr>`).join('');
 }
 
+function buildPDFFilename(r, suffix) {
+  let datePart = '';
+  if (r.date) {
+    const m = r.date.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})/);
+    if (m) datePart = m[1] + String(m[2]).padStart(2,'0') + String(m[3]).padStart(2,'0');
+  }
+  let namePart = (r.memo || '').replace(/（メモなし）/, '').trim();
+  namePart = namePart.replace(/[\\/:*?"<>|]/g, '');
+  if (!namePart) namePart = '無題';
+  return [datePart, namePart, suffix].filter(Boolean).join('_');
+}
+
 function printReportPDF(id) {
   const r = loadHistory().find(rec => rec.id === id);
   if (!r) return;
@@ -1098,7 +1110,12 @@ function printReportPDF(id) {
   const staffName = settings.staffName || '';
   const rows = buildPDFRows(r);
   const payLabelMap = { card: 'カード・請求書', cash: '現金' };
-  const payLabel = payLabelMap[r.payMethod === 'cash' ? 'cash' : 'card'];
+  const isCash = r.payMethod === 'cash';
+  const payLabel = payLabelMap[isCash ? 'cash' : 'card'];
+  const splitAmount = r.splitAmount || 0;
+  const paymentNote = isCash
+    ? `ご指定の口座にご指定日に入金させていただきます。<br><b style="font-size:11pt">${fmt(splitAmount)}円</b>`
+    : `指定口座へ入金よろしくお願いいたします。<br><b style="font-size:11pt">${fmt(splitAmount)}円</b>`;
   const remarksHtml = (r.errorCode || r.parts) ? `
     <div class="q-remarks" style="margin-bottom:4mm;border-top:none;padding-top:0">
       ${r.errorCode ? `エラーコード：${esc(r.errorCode)}　` : ''}
@@ -1152,7 +1169,8 @@ function printReportPDF(id) {
     </table>
     <div class="q-bottom" style="margin-bottom:4mm">
       <div class="q-validity">
-        決済方法：${payLabel}
+        決済方法：${payLabel}<br><br>
+        ${paymentNote}
       </div>
       <div class="q-total-table">
         <div class="q-total-row"><span>税抜合計</span><span>${fmt(r.taxex)}円</span></div>
@@ -1164,7 +1182,10 @@ function printReportPDF(id) {
     ${photosHtml}
     ${commentHtml}
   `;
+  const originalTitle = document.title;
+  document.title = buildPDFFilename(r, '報告書');
   window.print();
+  setTimeout(() => { document.title = originalTitle; }, 500);
 }
 
 function printInvoicePDF(id) {
@@ -1225,7 +1246,10 @@ function printInvoicePDF(id) {
     </div>
     ${memoHtml}
   `;
+  const originalTitle = document.title;
+  document.title = buildPDFFilename(r, '請求書');
   window.print();
+  setTimeout(() => { document.title = originalTitle; }, 500);
 }
 
 // ===== 週次集計（日曜始まり・土曜締） =====
@@ -1387,7 +1411,10 @@ function printClientPDFCard() {
   const cardLastWeek = { start: lastStart, end: lastEnd, records: list.filter(r => inRange(r, lastStart, lastEnd) && r.payMethod !== 'cash') };
 
   document.getElementById('print-area').innerHTML = buildClientPDFPage(cardLastWeek, 'カード・請求書払い分', '#4caf50', '振込合計（受取）');
+  const originalTitle1 = document.title;
+  document.title = '週次集計_カード請求書_' + fmtMD(lastStart).replace('/','') + '-' + fmtMD(lastEnd).replace('/','');
   window.print();
+  setTimeout(() => { document.title = originalTitle1; }, 500);
 }
 
 function printClientPDFCash() {
@@ -1403,7 +1430,10 @@ function printClientPDFCash() {
   const cashThisWeek = { start: thisStart, end: thisEnd, records: list.filter(r => inRange(r, thisStart, thisEnd) && r.payMethod === 'cash') };
 
   document.getElementById('print-area').innerHTML = buildClientPDFPage(cashThisWeek, '現金払い分', '#e57373', '振込合計（支払）');
+  const originalTitle2 = document.title;
+  document.title = '週次集計_現金_' + fmtMD(thisStart).replace('/','') + '-' + fmtMD(thisEnd).replace('/','');
   window.print();
+  setTimeout(() => { document.title = originalTitle2; }, 500);
 }
 
 function exportCSV() {
