@@ -261,6 +261,19 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
 <div class="main">
   <div class="section">
     <div class="section-header">
+      <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      お客様名
+    </div>
+    <div class="row">
+      <input type="text" id="customer-name-input" maxlength="40"
+        placeholder="〇〇様／株式会社〇〇御中"
+        style="flex:1;height:36px;border:none;font-size:14px;color:#1a1a1a;background:transparent;outline:none"
+        oninput="syncCustomerName()">
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
       <svg viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
       点検費
     </div>
@@ -544,13 +557,13 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
       予備・その他
     </div>
     <div class="gas-row">
-      <div class="gas-label"><div class="row-name">予備金額①</div><div class="row-price">税抜金額を入力</div></div>
+      <div class="gas-label"><div class="row-name">予備金額①</div><div class="row-price">税込金額を入力</div></div>
       <input class="gas-input" type="number" id="spare1-qty" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
       <span class="gas-unit">円</span>
       <span class="row-calc" id="spare1-price"></span>
     </div>
     <div class="gas-row">
-      <div class="gas-label"><div class="row-name">予備金額②</div><div class="row-price">税抜金額を入力</div></div>
+      <div class="gas-label"><div class="row-name">予備金額②</div><div class="row-price">税込金額を入力</div></div>
       <input class="gas-input" type="number" id="spare2-qty" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
       <span class="gas-unit">円</span>
       <span class="row-calc" id="spare2-price"></span>
@@ -562,6 +575,10 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
     <div class="row">
       <div class="row-label"><div class="row-name">発注部品</div></div>
       <input type="text" id="parts-input" placeholder="例：基板、ファンモーター" maxlength="60" style="flex:2;height:32px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;color:#1a1a1a">
+    </div>
+    <div class="row" style="align-items:flex-start;padding-top:12px">
+      <div class="row-label" style="padding-top:4px"><div class="row-name">コメント</div></div>
+      <textarea id="comment-input" placeholder="作業内容・気づいた点など" maxlength="300" rows="3" style="flex:2;border:1px solid #e0e0e0;border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;color:#1a1a1a;resize:vertical;font-family:inherit"></textarea>
     </div>
   </div>
 
@@ -718,6 +735,7 @@ function getGasQty(key) {
 }
 
 let currentLines = [], currentTaxin = 0;
+let reEditingId = null; // 再編集中の履歴ID（上書き保存用）
 
 function calcAll() {
   let total = 0; const lines = [];
@@ -725,10 +743,10 @@ function calcAll() {
     let q = 0, sub = 0;
     if (item.spare) {
       const el = document.getElementById(key + '-qty');
-      const taxex = Math.max(0, parseInt(el ? el.value : 0) || 0);
-      sub = Math.round(taxex * 1.1);
+      const taxin = Math.max(0, parseInt(el ? el.value : 0) || 0);
+      sub = taxin;
       const pEl = document.getElementById(key + '-price');
-      if (pEl) pEl.textContent = taxex > 0 ? fmt(sub) + '円' : '';
+      if (pEl) pEl.textContent = taxin > 0 ? fmt(sub) + '円' : '';
       if (sub > 0) {
         total += sub;
         lines.push({ name: item.label, price: sub });
@@ -764,6 +782,12 @@ function calcAll() {
   document.getElementById('total-ex').textContent = fmt(Math.round(total / 1.1));
   document.getElementById('result-items').textContent = lines.map(l => l.name).join(' | ');
   document.getElementById('save-btn').disabled = total === 0;
+  const saveBtnLabel = document.getElementById('save-btn').querySelector
+    ? document.getElementById('save-btn') : null;
+  if (saveBtnLabel) {
+    saveBtnLabel.childNodes[saveBtnLabel.childNodes.length - 1].textContent =
+      reEditingId ? '上書き保存' : '履歴に保存';
+  }
 }
 
 function resetAll() {
@@ -779,15 +803,22 @@ function resetAll() {
   document.getElementById('memo-input').value = '';
   document.getElementById('error-input').value = '';
   document.getElementById('parts-input').value = '';
+  document.getElementById('comment-input').value = '';
+  document.getElementById('customer-name-input').value = '';
   currentTaxin = 0; currentLines = [];
   document.getElementById('total-in').textContent = '0';
   document.getElementById('total-ex').textContent = '0';
   document.getElementById('result-items').textContent = '';
   document.getElementById('save-btn').disabled = true;
+  reEditingId = null;
   showToast('リセットしました');
 }
 
 // ===== localStorage =====
+function syncCustomerName() {
+  const name = document.getElementById('customer-name-input').value;
+  document.getElementById('memo-input').value = name;
+}
 function loadHistory() {
   try { return JSON.parse(localStorage.getItem(HIST_KEY)) || []; } catch(e) { return []; }
 }
@@ -809,6 +840,7 @@ async function saveRecord() {
   const memo = document.getElementById('memo-input').value.trim();
   const errorCode = document.getElementById('error-input').value.trim();
   const parts = document.getElementById('parts-input').value.trim();
+  const comment = document.getElementById('comment-input').value.trim();
   const now = new Date();
   const dateStr = now.getFullYear() + '/' +
     String(now.getMonth()+1).padStart(2,'0') + '/' +
@@ -823,6 +855,7 @@ async function saveRecord() {
     memo: memo || '（メモなし）',
     errorCode: errorCode,
     parts: parts,
+    comment: comment,
     taxin: currentTaxin,
     taxex: Math.round(currentTaxin / 1.1),
     lines: currentLines.slice(),
@@ -831,6 +864,30 @@ async function saveRecord() {
   };
 
   const list = loadHistory();
+
+  if (reEditingId) {
+    // 再編集モード：元の履歴に上書き（写真・発注経費・支払い方法は既存値を引き継ぐ）
+    const idx = list.findIndex(r => r.id === reEditingId);
+    if (idx !== -1) {
+      const old = list[idx];
+      record.id = old.id;
+      record.date = old.date;
+      record.timestamp = old.timestamp;
+      record.photos = old.photos || [];
+      record.cost = old.cost || 0;
+      record.payMethod = old.payMethod || 'card';
+      record.splitAmount = old.splitAmount || 0;
+      record.syncStatus = 'pending';
+      list[idx] = record;
+      storeHistory(list);
+      reEditingId = null;
+      updateHistoryCount();
+      showToast('上書き保存しました');
+      return;
+    }
+    reEditingId = null;
+  }
+
   list.unshift(record);
   storeHistory(list);
   updateHistoryCount();
@@ -1000,6 +1057,67 @@ async function sendRecord(id) {
   await syncRecord(rec);
 }
 
+function reEditRecord(id) {
+  const r = loadHistory().find(rec => rec.id === id);
+  if (!r) return;
+
+  // まずリセット
+  Object.keys(qty).forEach(k => {
+    qty[k] = 0;
+    const qEl = document.getElementById(k + '-qty');
+    if (qEl && qEl.tagName === 'SPAN') qEl.textContent = 0;
+    const pEl = document.getElementById(k + '-price');
+    if (pEl) pEl.textContent = '';
+  });
+  document.querySelectorAll('input[type=checkbox]').forEach(el => el.checked = false);
+  document.querySelectorAll('input.gas-input').forEach(el => el.value = 0);
+
+  // 保存されている明細から各項目を復元
+  r.lines.forEach(line => {
+    Object.entries(ITEMS).forEach(([key, item]) => {
+      if (item.spare || item.gas) return;
+      if (line.name.startsWith(item.label)) {
+        if (item.chk) {
+          const el = document.getElementById(key);
+          if (el) el.checked = true;
+        } else {
+          // ×数量 を取り出す
+          const match = line.name.match(/×(\d+)/);
+          const count = match ? parseInt(match[1]) : 1;
+          qty[key] = count;
+          const qEl = document.getElementById(key + '-qty');
+          if (qEl && qEl.tagName === 'SPAN') qEl.textContent = count;
+        }
+      }
+    });
+  });
+
+  // お客様名・各テキスト欄を復元
+  const customerEl = document.getElementById('customer-name-input');
+  const memoEl = document.getElementById('memo-input');
+  const name = r.memo === '（メモなし）' ? '' : r.memo;
+  if (customerEl) customerEl.value = name;
+  if (memoEl) memoEl.value = name;
+
+  const errorEl = document.getElementById('error-input');
+  if (errorEl) errorEl.value = r.errorCode || '';
+  const partsEl = document.getElementById('parts-input');
+  if (partsEl) partsEl.value = r.parts || '';
+  const commentEl = document.getElementById('comment-input');
+  if (commentEl) commentEl.value = r.comment || '';
+
+  // 発注経費・支払い方法は編集モーダル側で管理なのでスキップ
+
+  // 再編集中のIDを記憶（保存時に上書き）
+  reEditingId = id;
+
+  // 計算タブに切り替えて上部へスクロール
+  switchTab('calc');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  calcAll();
+  showToast('再編集モード：修正後「履歴に保存」を押してください');
+}
+
 function deleteRecord(id) {
   storeHistory(loadHistory().filter(r => r.id !== id));
   updateHistoryCount();
@@ -1063,6 +1181,7 @@ function renderHistory() {
       <div class="history-del">
         ${retryHtml}
         <button class="edit-btn" onclick="openEditModal(${r.id})">編集</button>
+        <button class="edit-btn" style="color:#555;border-color:#aaa" onclick="reEditRecord(${r.id})">再編集</button>
         ${(hasUrl && ss !== 'ok') ? `<button class="send-btn" onclick="sendRecord(${r.id})">送信</button>` : ''}
         <button class="pdf-btn" onclick="printInvoicePDF(${r.id})">
           <svg viewBox="0 0 24 24" style="width:12px;height:12px;stroke:#555;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
