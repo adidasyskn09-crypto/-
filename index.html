@@ -1072,16 +1072,22 @@ function reEditRecord(id) {
   document.querySelectorAll('input[type=checkbox]').forEach(el => el.checked = false);
   document.querySelectorAll('input.gas-input').forEach(el => el.value = 0);
 
-  // 保存されている明細から各項目を復元
+  // 予備金額を直接復元（linesのラベルマッチが不安定なため個別処理）
+  ['spare1','spare2'].forEach(key => {
+    const item = ITEMS[key];
+    const found = r.lines.find(l => l.name === item.label);
+    if (found) {
+      const el = document.getElementById(key + '-qty');
+      if (el) el.value = found.price;
+    }
+  });
+
+  // 保存されている明細から各項目を復元（予備金額・ガス以外）
   r.lines.forEach(line => {
     Object.entries(ITEMS).forEach(([key, item]) => {
+      if (item.spare) return; // 上で処理済み
       if (line.name.startsWith(item.label)) {
-        if (item.spare) {
-          // 予備金額：税込金額を直接復元
-          const el = document.getElementById(key + '-qty');
-          if (el) el.value = line.price;
-        } else if (item.gas) {
-          // ガス補填：×数量100g から数量を取り出す
+        if (item.gas) {
           const match = line.name.match(/×([\d.]+)/);
           const count = match ? parseFloat(match[1]) : 0;
           const el = document.getElementById(key + '-qty');
