@@ -943,12 +943,12 @@ function setEditPayMethod(method) {
 
 function updateEditSplitDisplay() {
   const cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
-  const base = Math.max(0, editingTaxin - cost);
   const isCash = editingPayMethod === 'cash';
-  const rate = isCash ? 0.7 : 0.3;
-  const amount = isCash ? Math.round(base * rate) : Math.round(base * rate) + cost;
+  const amount = isCash
+    ? Math.round(editingTaxin * 0.7) - cost
+    : Math.round(editingTaxin * 0.3) + cost;
   document.getElementById('edit-split-label').textContent = isCash ? '支払う金額（Cloverから発注元へ振込）' : '受け取る金額（発注元から振り込まれる）';
-  document.getElementById('edit-split-note').textContent = isCash ? '(税込合計 − 発注経費) × 70%' : '(税込合計 − 発注経費) × 30% + 発注経費';
+  document.getElementById('edit-split-note').textContent = isCash ? '税込合計 × 70% − 発注経費' : '税込合計 × 30% + 発注経費';
   document.getElementById('edit-split-amount').textContent = fmt(amount) + '円';
 }
 
@@ -1028,8 +1028,8 @@ function saveEdit() {
   rec.payMethod = editingPayMethod;
   const base = Math.max(0, (rec.taxin || 0) - rec.cost);
   rec.splitAmount = editingPayMethod === 'cash'
-    ? Math.round(base * 0.7)
-    : Math.round(base * 0.3) + rec.cost;
+    ? Math.round((rec.taxin || 0) * 0.7) - rec.cost
+    : Math.round((rec.taxin || 0) * 0.3) + rec.cost;
   storeHistory(list);
   closeEditModal();
   renderHistory();
@@ -1185,7 +1185,7 @@ function renderHistory() {
       </div>
       ${r.splitAmount != null ? `
       <div style="padding:10px 14px;border-top:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;background:#fffaf6">
-        <span style="font-size:12px;color:#888">${payLabel[r.payMethod === 'cash' ? 'cash' : 'card']}　${r.payMethod === 'cash' ? '→ 発注元へ支払い70%' : '→ 発注元から受取30%'}</span>
+        <span style="font-size:12px;color:#888">${payLabel[r.payMethod === 'cash' ? 'cash' : 'card']}　${r.payMethod === 'cash' ? '→ 発注元へ支払い（税込×70%−経費）' : '→ 発注元から受取（税込×30%＋経費）'}</span>
         <span style="font-size:15px;font-weight:700;color:#e07030">${fmt(r.splitAmount)}円</span>
       </div>` : ''}
       ${r.photos && r.photos.length > 0 ? `
