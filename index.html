@@ -611,6 +611,10 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
   <div class="memo-wrap">
     <input class="memo-input" type="text" id="memo-input" placeholder="メモ（現場名・お客様名など）" maxlength="40">
   </div>
+  <div class="memo-wrap" style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:12px;color:#aaa;white-space:nowrap">保存日付</span>
+    <input type="date" id="save-date-input" style="flex:1;height:36px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;color:#1a1a1a;background:#fff">
+  </div>
   <button class="save-btn" id="save-btn" onclick="saveRecord()" disabled>
     <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
     履歴に保存
@@ -805,6 +809,9 @@ function resetAll() {
   document.getElementById('parts-input').value = '';
   document.getElementById('comment-input').value = '';
   document.getElementById('customer-name-input').value = '';
+  // 日付を今日にリセット
+  const td = new Date();
+  document.getElementById('save-date-input').value = td.getFullYear() + '-' + String(td.getMonth()+1).padStart(2,'0') + '-' + String(td.getDate()).padStart(2,'0');
   currentTaxin = 0; currentLines = [];
   document.getElementById('total-in').textContent = '0';
   document.getElementById('total-ex').textContent = '0';
@@ -842,16 +849,20 @@ async function saveRecord() {
   const parts = document.getElementById('parts-input').value.trim();
   const comment = document.getElementById('comment-input').value.trim();
   const now = new Date();
-  const dateStr = now.getFullYear() + '/' +
-    String(now.getMonth()+1).padStart(2,'0') + '/' +
-    String(now.getDate()).padStart(2,'0') + ' ' +
+  // 日付入力欄の値があればそれを使う、なければ今日
+  const saveDateVal = document.getElementById('save-date-input').value;
+  const baseDate = saveDateVal ? new Date(saveDateVal + 'T00:00:00') : now;
+  const dateStr = baseDate.getFullYear() + '/' +
+    String(baseDate.getMonth()+1).padStart(2,'0') + '/' +
+    String(baseDate.getDate()).padStart(2,'0') + ' ' +
     String(now.getHours()).padStart(2,'0') + ':' +
     String(now.getMinutes()).padStart(2,'0');
+  const timestamp = saveDateVal ? new Date(saveDateVal + 'T' + String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0') + ':00').toISOString() : now.toISOString();
 
   const record = {
     id: Date.now(),
     date: dateStr,
-    timestamp: now.toISOString(),
+    timestamp: timestamp,
     memo: memo || '（メモなし）',
     errorCode: errorCode,
     parts: parts,
@@ -1661,6 +1672,13 @@ function showToast(msg) {
 
 updateHistoryCount();
 calcAll();
+
+// 日付欄を今日の日付で初期化
+(function(){
+  const td = new Date();
+  const el = document.getElementById('save-date-input');
+  if(el) el.value = td.getFullYear() + '-' + String(td.getMonth()+1).padStart(2,'0') + '-' + String(td.getDate()).padStart(2,'0');
+})();
 
 // 入力欄タップ時にキーボードで隠れないよう自動スクロール
 document.addEventListener('focusin', function(e) {
