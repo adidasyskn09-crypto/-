@@ -966,9 +966,9 @@ function updateEditSplitDisplay() {
   const base = Math.max(0, editingTaxin - cost);
   const amount = isCash
     ? Math.floor(Math.round(base * 700) / 1000)
-    : Math.floor(Math.round(editingTaxin * 300) / 1000) + cost;
+    : Math.floor(Math.round(base * 300) / 1000) + cost;
   document.getElementById('edit-split-label').textContent = isCash ? '支払う金額（Cloverから発注元へ振込）' : '受け取る金額（発注元から振り込まれる）';
-  document.getElementById('edit-split-note').textContent = isCash ? '税込合計 × 70%' : '税込合計 × 30% + 発注経費';
+  document.getElementById('edit-split-note').textContent = isCash ? '対象金額 × 70%' : '対象金額 × 30% + 発注経費';
   document.getElementById('edit-split-amount').textContent = fmt(amount) + '円';
 }
 
@@ -1049,7 +1049,7 @@ function saveEdit() {
   const base = Math.max(0, (rec.taxin || 0) - rec.cost);
   rec.splitAmount = editingPayMethod === 'cash'
     ? Math.floor(Math.round(base * 700) / 1000)
-    : Math.floor(Math.round((rec.taxin || 0) * 300) / 1000) + rec.cost;
+    : Math.floor(Math.round(base * 300) / 1000) + rec.cost;
   storeHistory(list);
   closeEditModal();
   renderHistory();
@@ -1207,7 +1207,7 @@ function renderHistory() {
       </div>
       ${r.splitAmount != null ? `
       <div style="padding:10px 14px;border-top:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;background:#fffaf6">
-        <span style="font-size:12px;color:#888">${payLabel[r.payMethod === 'cash' ? 'cash' : 'card']}　${r.payMethod === 'cash' ? '→ 発注元へ支払い（税込×70%）' : '→ 発注元から受取（税込×30%＋経費）'}</span>
+        <span style="font-size:12px;color:#888">${payLabel[r.payMethod === 'cash' ? 'cash' : 'card']}　${r.payMethod === 'cash' ? '→ 発注元へ支払い（対象金額×70%）' : '→ 発注元から受取（対象金額×30%＋経費）'}</span>
         <span style="font-size:15px;font-weight:700;color:#e07030">${fmt(r.splitAmount)}円</span>
       </div>` : ''}
       ${r.photos && r.photos.length > 0 ? `
@@ -1331,7 +1331,7 @@ function printReportPDF(id) {
         <div class="q-total-row ${r.cost ? '' : 'main'}"><span>合計（税込）${r.cost ? '<br><span style="font-size:8pt;color:#aaa">振込対象金額</span>' : ''}</span><span>${fmt(r.taxin)}円</span></div>
         ${r.cost ? `<div class="q-total-row"><span>発注経費</span><span>${fmt(r.cost)}円</span></div>` : ''}
         ${r.cost ? `<div class="q-total-row main"><span>合計（経費差引）</span><span>${fmt(Math.max(0,(r.taxin||0)-(r.cost||0)))}円</span></div>` : ''}
-        ${r.splitAmount != null ? `<div class="q-total-row main"><span>${isCash ? '振込金額（対象金額×70%）' : 'お求め金額（税込×30%＋経費）'}</span><span>${fmt(r.splitAmount)}円</span></div>` : ''}
+        ${r.splitAmount != null ? `<div class="q-total-row main"><span>${isCash ? '振込金額（対象金額×70%）' : 'お求め金額（対象金額×30%＋経費）'}</span><span>${fmt(r.splitAmount)}円</span></div>` : ''}
       </div>
     </div>
     ${remarksHtml}
