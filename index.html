@@ -568,6 +568,11 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
       <span class="gas-unit">円</span>
       <span class="row-calc" id="spare2-price"></span>
     </div>
+    <div class="gas-row">
+      <div class="gas-label"><div class="row-name">発注経費</div><div class="row-price">税込金額を入力</div></div>
+      <input class="gas-input" type="number" id="cost-input" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
+      <span class="gas-unit">円</span>
+    </div>
     <div class="row">
       <div class="row-label"><div class="row-name">エラーコード</div></div>
       <input type="text" id="error-input" placeholder="例：E6、F3など" maxlength="40" style="flex:2;height:32px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;color:#1a1a1a">
@@ -782,8 +787,10 @@ function calcAll() {
     }
   });
   currentTaxin = total; currentLines = lines;
-  document.getElementById('total-in').textContent = fmt(total);
-  document.getElementById('total-ex').textContent = fmt(Math.round(total / 1.1));
+  const costVal = Math.max(0, parseInt(document.getElementById('cost-input')?.value) || 0);
+  const totalWithCost = total + costVal;
+  document.getElementById('total-in').textContent = fmt(totalWithCost);
+  document.getElementById('total-ex').textContent = fmt(Math.round(totalWithCost / 1.1));
   document.getElementById('result-items').textContent = lines.map(l => l.name).join(' | ');
   document.getElementById('save-btn').disabled = total === 0;
   const saveBtnLabel = document.getElementById('save-btn').querySelector
@@ -809,6 +816,7 @@ function resetAll() {
   document.getElementById('parts-input').value = '';
   document.getElementById('comment-input').value = '';
   document.getElementById('customer-name-input').value = '';
+  document.getElementById('cost-input').value = 0;
   // 日付を今日にリセット
   const td = new Date();
   document.getElementById('save-date-input').value = td.getFullYear() + '-' + String(td.getMonth()+1).padStart(2,'0') + '-' + String(td.getDate()).padStart(2,'0');
@@ -848,6 +856,7 @@ async function saveRecord() {
   const errorCode = document.getElementById('error-input').value.trim();
   const parts = document.getElementById('parts-input').value.trim();
   const comment = document.getElementById('comment-input').value.trim();
+  const costInput = Math.max(0, parseInt(document.getElementById('cost-input').value) || 0);
   const now = new Date();
   // 日付入力欄の値があればそれを使う、なければ今日
   const saveDateVal = document.getElementById('save-date-input').value;
@@ -867,6 +876,7 @@ async function saveRecord() {
     errorCode: errorCode,
     parts: parts,
     comment: comment,
+    cost: costInput,
     taxin: currentTaxin,
     taxex: Math.round(currentTaxin / 1.1),
     lines: currentLines.slice(),
@@ -956,10 +966,10 @@ function updateEditSplitDisplay() {
   const cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
   const isCash = editingPayMethod === 'cash';
   const amount = isCash
-    ? Math.round(editingTaxin * 0.7) - cost
-    : Math.round(editingTaxin * 0.3) + cost;
+    ? Math.floor(Math.round(editingTaxin * 700) / 1000)
+    : Math.floor(Math.round(editingTaxin * 300) / 1000) + cost;
   document.getElementById('edit-split-label').textContent = isCash ? '支払う金額（Cloverから発注元へ振込）' : '受け取る金額（発注元から振り込まれる）';
-  document.getElementById('edit-split-note').textContent = isCash ? '税込合計 × 70% − 発注経費' : '税込合計 × 30% + 発注経費';
+  document.getElementById('edit-split-note').textContent = isCash ? '税込合計 × 70%' : '税込合計 × 30% + 発注経費';
   document.getElementById('edit-split-amount').textContent = fmt(amount) + '円';
 }
 
@@ -1039,8 +1049,8 @@ function saveEdit() {
   rec.payMethod = editingPayMethod;
   const base = Math.max(0, (rec.taxin || 0) - rec.cost);
   rec.splitAmount = editingPayMethod === 'cash'
-    ? Math.round((rec.taxin || 0) * 0.7) - rec.cost
-    : Math.round((rec.taxin || 0) * 0.3) + rec.cost;
+    ? Math.floor(Math.round((rec.taxin || 0) * 700) / 1000)
+    : Math.floor(Math.round((rec.taxin || 0) * 300) / 1000) + rec.cost;
   storeHistory(list);
   closeEditModal();
   renderHistory();
@@ -1130,6 +1140,8 @@ function reEditRecord(id) {
   if (partsEl) partsEl.value = r.parts || '';
   const commentEl = document.getElementById('comment-input');
   if (commentEl) commentEl.value = r.comment || '';
+  const costEl = document.getElementById('cost-input');
+  if (costEl) costEl.value = r.cost || 0;
 
   // 発注経費・支払い方法は編集モーダル側で管理なのでスキップ
 
@@ -1185,7 +1197,7 @@ function renderHistory() {
           ${syncHtml}
         </div>
         <div class="history-amounts">
-          <div class="history-taxin">${fmt(r.taxin)}円</div>
+          <div class="history-taxin">${fmt((r.taxin||0) + (r.cost||0))}円</div>
           <div class="history-taxex">税抜 ${fmt(r.taxex)}円</div>
         </div>
       </div>
@@ -1196,7 +1208,7 @@ function renderHistory() {
       </div>
       ${r.splitAmount != null ? `
       <div style="padding:10px 14px;border-top:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;background:#fffaf6">
-        <span style="font-size:12px;color:#888">${payLabel[r.payMethod === 'cash' ? 'cash' : 'card']}　${r.payMethod === 'cash' ? '→ 発注元へ支払い（税込×70%−経費）' : '→ 発注元から受取（税込×30%＋経費）'}</span>
+        <span style="font-size:12px;color:#888">${payLabel[r.payMethod === 'cash' ? 'cash' : 'card']}　${r.payMethod === 'cash' ? '→ 発注元へ支払い（税込×70%）' : '→ 発注元から受取（税込×30%＋経費）'}</span>
         <span style="font-size:15px;font-weight:700;color:#e07030">${fmt(r.splitAmount)}円</span>
       </div>` : ''}
       ${r.photos && r.photos.length > 0 ? `
@@ -1298,7 +1310,7 @@ function printReportPDF(id) {
     </div>
     <div class="q-amount-box" style="margin-bottom:4mm">
       <div class="q-amount-label">作業（点検）費用</div>
-      <div class="q-amount-value">${fmt(r.taxin)}円</div>
+      <div class="q-amount-value">${fmt((r.taxin||0) + (r.cost||0))}円</div>
     </div>
     <table class="q-table" style="margin-bottom:4mm">
       <thead>
@@ -1317,9 +1329,10 @@ function printReportPDF(id) {
         ${paymentNote}
       </div>
       <div class="q-total-table">
-        <div class="q-total-row"><span>税抜合計</span><span>${fmt(r.taxex)}円</span></div>
-        <div class="q-total-row"><span>消費税（10%）</span><span>${fmt(r.taxin - r.taxex)}円</span></div>
-        <div class="q-total-row main"><span>合計（税込）</span><span>${fmt(r.taxin)}円</span></div>
+        ${r.cost ? `<div class="q-total-row main"><span>合計（経費込み）</span><span>${fmt((r.taxin||0)+(r.cost||0))}円</span></div>` : ''}
+        ${r.cost ? `<div class="q-total-row"><span>発注経費</span><span>${fmt(r.cost)}円</span></div>` : ''}
+        <div class="q-total-row ${r.cost ? '' : 'main'}"><span>合計（税込）${r.cost ? '<br><span style="font-size:8pt;color:#aaa">振込対象金額</span>' : ''}</span><span>${fmt(r.taxin)}円</span></div>
+        ${r.splitAmount != null ? `<div class="q-total-row main"><span>${isCash ? '振込金額（税込×70%）' : 'お求め金額（税込×30%＋経費）'}</span><span>${fmt(r.splitAmount)}円</span></div>` : ''}
       </div>
     </div>
     ${remarksHtml}
