@@ -224,6 +224,8 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
     <input class="modal-input" type="text" id="edit-parts" maxlength="60">
     <div class="modal-label">発注経費（税込）</div>
     <input class="modal-input" type="number" id="edit-cost" min="0" oninput="updateEditSplitDisplay()">
+    <div class="modal-label">点検費（税込）</div>
+    <input class="modal-input" type="number" id="edit-inspection" min="0">
     <div class="modal-label">支払い方法</div>
     <div style="display:flex;gap:6px">
       <button type="button" class="pay-btn" id="edit-pay-card" onclick="setEditPayMethod('card')" style="flex:1">カード・請求書</button>
@@ -573,6 +575,11 @@ input[type=checkbox]{width:20px;height:20px;accent-color:#e07030;cursor:pointer}
       <input class="gas-input" type="number" id="cost-input" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
       <span class="gas-unit">円</span>
     </div>
+    <div class="gas-row">
+      <div class="gas-label"><div class="row-name">点検費</div><div class="row-price">税込金額を入力</div></div>
+      <input class="gas-input" type="number" id="inspection-input" value="0" min="0" step="1" inputmode="numeric" oninput="calcAll()" style="width:90px">
+      <span class="gas-unit">円</span>
+    </div>
     <div class="row">
       <div class="row-label"><div class="row-name">エラーコード</div></div>
       <input type="text" id="error-input" placeholder="例：E6、F3など" maxlength="40" style="flex:2;height:32px;border:1px solid #e0e0e0;border-radius:8px;padding:0 10px;font-size:13px;background:#fff;color:#1a1a1a">
@@ -815,6 +822,7 @@ function resetAll() {
   document.getElementById('comment-input').value = '';
   document.getElementById('customer-name-input').value = '';
   document.getElementById('cost-input').value = 0;
+  document.getElementById('inspection-input').value = 0;
   // 日付を今日にリセット
   const td = new Date();
   document.getElementById('save-date-input').value = td.getFullYear() + '-' + String(td.getMonth()+1).padStart(2,'0') + '-' + String(td.getDate()).padStart(2,'0');
@@ -855,6 +863,7 @@ async function saveRecord() {
   const parts = document.getElementById('parts-input').value.trim();
   const comment = document.getElementById('comment-input').value.trim();
   const costInput = Math.max(0, parseInt(document.getElementById('cost-input').value) || 0);
+  const inspectionInput = Math.max(0, parseInt(document.getElementById('inspection-input').value) || 0);
   const now = new Date();
   // 日付入力欄の値があればそれを使う、なければ今日
   const saveDateVal = document.getElementById('save-date-input').value;
@@ -875,6 +884,7 @@ async function saveRecord() {
     parts: parts,
     comment: comment,
     cost: costInput,
+    inspection: inspectionInput,
     taxin: currentTaxin,
     taxex: Math.round(currentTaxin / 1.1),
     lines: currentLines.slice(),
@@ -962,11 +972,12 @@ function setEditPayMethod(method) {
 
 function updateEditSplitDisplay() {
   const cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
+  const inspection = Math.max(0, parseInt(document.getElementById('edit-inspection').value) || 0);
   const isCash = editingPayMethod === 'cash';
-  const base = Math.max(0, editingTaxin - cost);
+  const base = Math.max(0, editingTaxin - cost - inspection);
   const amount = isCash
     ? Math.floor(Math.round(base * 700) / 1000)
-    : Math.floor(Math.round(base * 300) / 1000) + cost;
+    : Math.floor(Math.round(base * 300) / 1000) + cost + inspection;
   document.getElementById('edit-split-label').textContent = isCash ? '支払う金額（Cloverから発注元へ振込）' : '受け取る金額（発注元から振り込まれる）';
   document.getElementById('edit-split-note').textContent = isCash ? '対象金額 × 70%' : '対象金額 × 30% + 発注経費';
   document.getElementById('edit-split-amount').textContent = fmt(amount) + '円';
@@ -983,6 +994,7 @@ function openEditModal(id) {
   document.getElementById('edit-parts').value = r.parts || '';
   document.getElementById('edit-comment').value = r.comment || '';
   document.getElementById('edit-cost').value = r.cost || 0;
+  document.getElementById('edit-inspection').value = r.inspection || 0;
   setEditPayMethod(r.payMethod === 'cash' ? 'cash' : 'card');
   renderEditPhotos();
   document.getElementById('edit-modal').classList.remove('hidden');
@@ -1045,11 +1057,12 @@ function saveEdit() {
   rec.comment = document.getElementById('edit-comment').value.trim();
   rec.photos = editingPhotos.slice();
   rec.cost = Math.max(0, parseInt(document.getElementById('edit-cost').value) || 0);
+  rec.inspection = Math.max(0, parseInt(document.getElementById('edit-inspection').value) || 0);
   rec.payMethod = editingPayMethod;
-  const base = Math.max(0, (rec.taxin || 0) - rec.cost);
+  const base = Math.max(0, (rec.taxin || 0) - rec.cost - rec.inspection);
   rec.splitAmount = editingPayMethod === 'cash'
     ? Math.floor(Math.round(base * 700) / 1000)
-    : Math.floor(Math.round(base * 300) / 1000) + rec.cost;
+    : Math.floor(Math.round(base * 300) / 1000) + rec.cost + rec.inspection;
   storeHistory(list);
   closeEditModal();
   renderHistory();
@@ -1141,6 +1154,8 @@ function reEditRecord(id) {
   if (commentEl) commentEl.value = r.comment || '';
   const costEl = document.getElementById('cost-input');
   if (costEl) costEl.value = r.cost || 0;
+  const inspectionEl = document.getElementById('inspection-input');
+  if (inspectionEl) inspectionEl.value = r.inspection || 0;
 
   // 発注経費・支払い方法は編集モーダル側で管理なのでスキップ
 
@@ -1203,7 +1218,8 @@ function renderHistory() {
       <div class="history-lines">
         ${r.lines.map(l => `<div class="history-line"><span class="history-line-name">${esc(l.name)}</span><span class="history-line-price">${fmt(l.price)}円</span></div>`).join('')}
         ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">発注経費</span><span class="history-line-price" style="color:#aaa">−${fmt(r.cost)}円</span></div>` : ''}
-        ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">対象金額（税込合計−発注経費）</span><span class="history-line-price" style="color:#aaa">${fmt(Math.max(0,(r.taxin||0)-r.cost))}円</span></div>` : ''}
+        ${r.inspection ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">点検費</span><span class="history-line-price" style="color:#aaa">−${fmt(r.inspection)}円</span></div>` : ''}
+        ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">対象金額</span><span class="history-line-price" style="color:#aaa">${fmt(Math.max(0,(r.taxin||0)-r.cost-(r.inspection||0)))}円</span></div>` : ''}
       </div>
       ${r.splitAmount != null ? `
       <div style="padding:10px 14px;border-top:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;background:#fffaf6">
@@ -1330,7 +1346,8 @@ function printReportPDF(id) {
       <div class="q-total-table">
         <div class="q-total-row ${r.cost ? '' : 'main'}"><span>合計（税込）${r.cost ? '<br><span style="font-size:8pt;color:#aaa">振込対象金額</span>' : ''}</span><span>${fmt(r.taxin)}円</span></div>
         ${r.cost ? `<div class="q-total-row"><span>発注経費</span><span>${fmt(r.cost)}円</span></div>` : ''}
-        ${r.cost ? `<div class="q-total-row main"><span>合計（経費差引）</span><span>${fmt(Math.max(0,(r.taxin||0)-(r.cost||0)))}円</span></div>` : ''}
+        ${r.inspection ? `<div class="q-total-row"><span>点検費</span><span>${fmt(r.inspection)}円</span></div>` : ''}
+        ${r.cost ? `<div class="q-total-row main"><span>合計（経費差引）</span><span>${fmt(Math.max(0,(r.taxin||0)-(r.cost||0)-(r.inspection||0)))}円</span></div>` : ''}
         ${r.splitAmount != null ? `<div class="q-total-row main"><span>${isCash ? '振込金額（対象金額×70%）' : 'お求め金額（対象金額×30%＋経費）'}</span><span>${fmt(r.splitAmount)}円</span></div>` : ''}
       </div>
     </div>
