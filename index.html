@@ -806,7 +806,7 @@ function calcAll() {
   document.getElementById('total-in').textContent = fmt(totalDisplay);
   document.getElementById('total-ex').textContent = fmt(Math.round(totalDisplay / 1.1));
   document.getElementById('result-items').textContent = lines.map(l => l.name).join(' | ');
-  document.getElementById('save-btn').disabled = total === 0;
+  document.getElementById('save-btn').disabled = false;
   const saveBtnLabel = document.getElementById('save-btn').querySelector
     ? document.getElementById('save-btn') : null;
   if (saveBtnLabel) {
@@ -866,7 +866,6 @@ function storeSettings(s) { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)
 
 // ===== 保存（ローカルのみ・GAS送信は手動） =====
 async function saveRecord() {
-  if (currentTaxin === 0) return;
   const settings = loadSettings();
   const memo = document.getElementById('memo-input').value.trim();
   const errorCode = document.getElementById('error-input').value.trim();
