@@ -801,8 +801,9 @@ function calcAll() {
     }
   });
   currentTaxin = total; currentLines = lines;
+  const inspectionVal = Math.max(0, parseInt(document.getElementById('inspection-input')?.value) || 0);
   const adjustmentVal = Math.max(0, parseInt(document.getElementById('adjustment-input')?.value) || 0);
-  const totalDisplay = Math.max(0, total - adjustmentVal);
+  const totalDisplay = Math.max(0, total + inspectionVal - adjustmentVal);
   document.getElementById('total-in').textContent = fmt(totalDisplay);
   document.getElementById('total-ex').textContent = fmt(Math.round(totalDisplay / 1.1));
   document.getElementById('result-items').textContent = lines.map(l => l.name).join(' | ');
@@ -1227,16 +1228,16 @@ function renderHistory() {
           ${syncHtml}
         </div>
         <div class="history-amounts">
-          <div class="history-taxin">${fmt(r.taxin)}円</div>
+          <div class="history-taxin">${fmt(Math.max(0,(r.taxin||0)+(r.inspection||0)-(r.adjustment||0)))}円</div>
           <div class="history-taxex">税抜 ${fmt(r.taxex)}円</div>
         </div>
       </div>
       <div class="history-lines">
         ${r.lines.map(l => `<div class="history-line"><span class="history-line-name">${esc(l.name)}</span><span class="history-line-price">${fmt(l.price)}円</span></div>`).join('')}
         ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">発注経費</span><span class="history-line-price" style="color:#aaa">−${fmt(r.cost)}円</span></div>` : ''}
-        ${r.inspection ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">点検費</span><span class="history-line-price" style="color:#aaa">−${fmt(r.inspection)}円</span></div>` : ''}
+        ${r.inspection ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">点検費</span><span class="history-line-price" style="color:#aaa">+${fmt(r.inspection)}円</span></div>` : ''}
         ${r.adjustment ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">調整金</span><span class="history-line-price" style="color:#aaa">${fmt(r.adjustment)}円</span></div>` : ''}
-        ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">対象金額</span><span class="history-line-price" style="color:#aaa">${fmt(Math.max(0,(r.taxin||0)-(r.cost||0)-(r.inspection||0)-(r.adjustment||0)))}円</span></div>` : ''}
+        ${r.cost ? `<div class="history-line"><span class="history-line-name" style="color:#aaa">対象金額</span><span class="history-line-price" style="color:#aaa">${fmt(Math.max(0,(r.taxin||0)-(r.cost||0)-(r.adjustment||0)))}円</span></div>` : ''}
       </div>
       ${r.splitAmount != null ? `
       <div style="padding:10px 14px;border-top:1px solid #f5f5f5;display:flex;align-items:center;justify-content:space-between;background:#fffaf6">
@@ -1350,7 +1351,7 @@ function printReportPDF(id) {
     </div>
     <div class="q-amount-box" style="margin-bottom:4mm">
       <div class="q-amount-label">作業（点検）費用</div>
-      <div class="q-amount-value">${fmt(Math.max(0,(r.taxin||0)-(r.adjustment||0)))}円</div>
+      <div class="q-amount-value">${fmt(Math.max(0,(r.taxin||0)+(r.inspection||0)-(r.adjustment||0)))}円</div>
     </div>
     <table class="q-table" style="margin-bottom:4mm">
       <thead>
