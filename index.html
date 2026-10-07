@@ -48,7 +48,10 @@
     .photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .photo-item{background:#fff;border-radius:11px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.08);cursor:pointer;position:relative}
     .photo-item:active{opacity:0.8}
-    .photo-frame{width:100%;aspect-ratio:1/1;background:#E8F0FE;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .photo-frame{width:100%;aspect-ratio:var(--photo-ratio,1/1);background:#E8F0FE;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .ratio-row{display:flex;align-items:center;gap:6px;margin-top:9px}
+    .ratio-btn{background:none;border:1.5px solid var(--border);border-radius:6px;padding:3px 11px;font-size:12px;font-family:inherit;cursor:pointer;color:var(--sub);transition:all 0.15s}
+    .ratio-btn.active{background:var(--primary);color:#fff;border-color:var(--primary)}
     .photo-frame img{width:100%;height:100%;object-fit:cover;display:block}
     .photo-empty{display:flex;flex-direction:column;align-items:center;color:#90CAF9;gap:5px}
     .photo-empty .ei{font-size:28px}.photo-empty .et{font-size:10px;font-weight:bold}
@@ -58,6 +61,7 @@
     .photo-label{padding:5px 6px;font-size:12px;font-weight:bold;border-top:1px solid #F0F0F0;display:flex;align-items:center;justify-content:center;gap:3px}
     .label-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;text-align:center;min-width:0}
     .label-edit-btn{background:none;border:none;font-size:13px;cursor:pointer;padding:0;line-height:1;opacity:0.7;flex-shrink:0}
+    .label-ratio-btn{background:var(--primary);color:#fff;border:none;border-radius:3px;font-size:9px;font-weight:bold;padding:1px 4px;cursor:pointer;flex-shrink:0;font-family:inherit;line-height:1.4}
     .label-edit-btn:active{opacity:1}
     .label-edit-input{width:100%;font-size:12px;font-weight:bold;border:1.5px solid var(--primary);border-radius:4px;padding:2px 4px;text-align:center;font-family:inherit;outline:none;background:#fff}
     #overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:999;flex-direction:column;align-items:center;justify-content:center;color:#fff;gap:16px}
@@ -251,17 +255,17 @@ function getToken(){
   });
 }
 const DEFAULT_CATEGORIES=['部屋番号','玄関タタキ','キッチン','防水パン','浴室','居室','エアコン','押入','下駄箱'];
-let state={building:'',room:'',date:todayStr(),sender:'',memo:'',categories:[...DEFAULT_CATEGORIES],photos:{}};
+let state={building:'',room:'',date:todayStr(),sender:'',memo:'',ratio:'1:1',photoRatios:{},categories:[...DEFAULT_CATEGORIES],photos:{}};
 function todayStr(){return new Date().toISOString().split('T')[0];}
 function saveState(){
   try{
-    localStorage.setItem('seko_meta',JSON.stringify({building:state.building,room:state.room,date:state.date,sender:state.sender,memo:state.memo||'',categories:state.categories}));
+    localStorage.setItem('seko_meta',JSON.stringify({building:state.building,room:state.room,date:state.date,sender:state.sender,memo:state.memo||'',ratio:state.ratio||'1:1',photoRatios:state.photoRatios||{},categories:state.categories}));
     localStorage.setItem('seko_photos',JSON.stringify(state.photos));
   }catch(e){}
 }
 function loadState(){
   try{
-    if(localStorage.getItem('seko_ver')!=='2'){localStorage.removeItem('seko_meta');localStorage.removeItem('seko_photos');localStorage.setItem('seko_ver','2');return;}
+    if(localStorage.getItem('seko_ver')!=='3'){localStorage.removeItem('seko_meta');localStorage.removeItem('seko_photos');localStorage.setItem('seko_ver','3');return;}
     const m=localStorage.getItem('seko_meta'),p=localStorage.getItem('seko_photos');
     if(m)Object.assign(state,JSON.parse(m));if(p)state.photos=JSON.parse(p);
   }catch(e){}
@@ -354,6 +358,13 @@ function onTouchEnd(e){
 }
 function addCategory(){const inp=document.getElementById('inp-newcat'),name=inp.value.trim();if(!name)return;if(state.categories.includes(name)){alert('「'+name+'」はすでに存在します');return;}state.categories.push(name);inp.value='';renderCategories();saveState();}
 function deleteCategory(i){if(!confirm('「'+state.categories[i]+'」を削除しますか？'))return;delete state.photos[state.categories[i]];state.categories.splice(i,1);renderCategories();saveState();}
+function cyclePhotoRatio(cat){
+  const cur=(state.photoRatios&&state.photoRatios[cat])||'1:1';
+  // 横(4:3) ↔ 縦(3:4) のみ2択
+  const next=cur==='4:3'?'3:4':'4:3';
+  if(!state.photoRatios)state.photoRatios={};
+  state.photoRatios[cat]=next;saveState();renderPhotoGrid();
+}
 function renderPhotoGrid(){
   const grid=document.getElementById('photo-grid');grid.innerHTML='';
   const total=state.categories.length,done=state.categories.filter(c=>state.photos[c]).length;
@@ -361,13 +372,18 @@ function renderPhotoGrid(){
   document.getElementById('prog-fill').style.width=total?(done/total*100)+'%':'0%';
   state.categories.forEach(cat=>{
     const item=document.createElement('div');item.className='photo-item';item.onclick=()=>startCapture(cat);
-    const labelHTML='<div class="photo-label"><span class="label-text">'+esc(cat)+'</span><button class="label-edit-btn" title="名前を変更">✏️</button></div>';
+    const phRatio=(state.photoRatios&&state.photoRatios[cat])||'4:3';
+    const arMap={'4:3':'4/3','1:1':'1/1','3:4':'3/4'};
+    item.style.setProperty('--photo-ratio',arMap[phRatio]);
+    const rLabel=phRatio==='4:3'?'横':'縦';
+    const labelHTML='<div class="photo-label"><button class="label-ratio-btn">'+rLabel+'</button><span class="label-text">'+esc(cat)+'</span><button class="label-edit-btn" title="名前を変更">✏️</button></div>';
     if(state.photos[cat]){
       item.innerHTML='<div class="photo-frame"><img src="'+state.photos[cat]+'" alt="'+esc(cat)+'"></div>'+labelHTML+'<div class="photo-badge">✓</div><button class="photo-del" title="写真を削除">🗑</button>';
       item.querySelector('.photo-del').onclick=(e)=>{e.stopPropagation();deletePhoto(cat);};
     }else{
       item.innerHTML='<div class="photo-frame"><div class="photo-empty"><span class="ei">📷</span><span class="et">タップして撮影</span></div></div>'+labelHTML;
     }
+    item.querySelector('.label-ratio-btn').onclick=(e)=>{e.stopPropagation();cyclePhotoRatio(cat);};
     item.querySelector('.label-edit-btn').onclick=(e)=>{e.stopPropagation();startLabelEdit(item,cat);};
     grid.appendChild(item);
   });
@@ -375,7 +391,7 @@ function renderPhotoGrid(){
 function deletePhoto(cat){delete state.photos[cat];saveState();renderPhotoGrid();}
 function resetPhotos(){
   if(!confirm('写真と物件情報をリセットしますか？\n（担当者名・撮影項目は残ります）'))return;
-  state.photos={};state.building='';state.room='';state.date=todayStr();state.memo='';
+  state.photos={};state.photoRatios={};state.building='';state.room='';state.date=todayStr();state.memo='';
   document.getElementById('inp-building').value='';document.getElementById('inp-room').value='';document.getElementById('inp-date').value=state.date;document.getElementById('inp-memo').value='';
   saveState();renderPhotoGrid();
 }
@@ -410,7 +426,7 @@ let _lastPdfBlob=null,_lastFileName=null;
 async function generatePDF(){
   syncSetup();if(!Object.keys(state.photos).length){alert('写真を撮影してください');return;}
   showOverlay('PDF作成中...');await sleep(80);
-  try{const{blob,fileName}=await buildPDF();_lastPdfBlob=blob;_lastFileName=fileName;const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}
+  try{const{blob,fileName}=await buildPDF();_lastPdfBlob=blob;_lastFileName=fileName;dlBlob(blob,fileName);}
   catch(err){alert('エラー: '+err.message);}finally{hideOverlay();}
 }
 async function generateAndUpload(){
@@ -418,17 +434,23 @@ async function generateAndUpload(){
   showOverlay('PDF作成中...');await sleep(80);
   try{
     const{blob,fileName}=await buildPDF();_lastPdfBlob=blob;_lastFileName=fileName;
-    const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=fileName;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+    dlBlob(blob,fileName);
     showOverlay('Googleドライブに保存中...');await uploadToDrive(blob,fileName);hideOverlay();
     alert('✅ 端末に保存 ＆ Googleドライブにアップロードしました！');
   }catch(err){hideOverlay();if(err.message!=='popup_closed_by_user')alert('エラー: '+err.message);}
 }
+function dlBlob(blob,fileName){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fileName;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
 async function buildPDF(){
   const{jsPDF}=window.jspdf;const doc=new jsPDF({orientation:'portrait',unit:'pt',format:'a4'});
   const PW=595.28,PH=841.89,mg=28,cg=8,cW=(PW-mg*2-cg)/2,hH=54,hG=8,lH=27,rG=7;
-  const PG=6,pages=Math.ceil(state.categories.length/PG);
   const tS=state.building+' '+state.room,dS=fmtDateJP(state.date);
   const memo=state.memo||'';
+  const PG=6,pages=Math.ceil(state.categories.length/PG);
   for(let p=0;p<pages;p++){
     if(p>0)doc.addPage();
     const cats=state.categories.slice(p*PG,(p+1)*PG);
@@ -436,9 +458,7 @@ async function buildPDF(){
     const memoH=isLast&&memo?72:0;
     const avail=PH-mg*2-hH-hG-(memoH?memoH+8:0);
     const rH=(avail-rG*2)/3,pH=rH-lH;
-    // 正方形: 列幅をphotoの高さ(pH)に合わせ、左右マージンで中央寄せ
-    const sqCW=pH,sqMg=(PW-sqCW*2-cg)/2;
-    const L={PW,PH,mg:sqMg,cg,cW:sqCW,hH,hG,lH,rG,rH,pH};
+    const L={PW,PH,mg,cg,cW,hH,hG,lH,rG,rH,pH};
     const cv=await drawPage(cats,tS,dS,L,isLast?memo:'',memoH);
     doc.addImage(cv.toDataURL('image/jpeg',0.93),'JPEG',0,0,PW,PH);
   }
